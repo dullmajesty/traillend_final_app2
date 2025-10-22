@@ -1,0 +1,212 @@
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: auto; /* allow main content scrolling */
+}
+
+
+body {
+  font-family: "Poppins", Arial, sans-serif;
+  color: #191a19;
+  display: flex;
+  flex-direction: column;
+  background: #f4f6f9;
+}
+
+/* Header */
+.header {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  height: 60px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  position: fixed;    /* fix header */
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #444;
+}
+
+.logo img.avatar {
+  width: 50px;
+  height: 36px;
+  object-fit: contain;
+  margin-right: 10px;
+}
+
+.header-title {
+  flex: 1;
+  text-align: center;
+  font-size: 1rem;
+  color: #444;
+  font-weight: 500;
+}
+
+.header-right i {
+  margin-left: 18px;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: #555;
+  transition: color 0.3s;
+}
+
+.header-right i:hover {
+  color: #97c6d2;
+}
+
+/* Layout */
+.container {
+  display: flex;
+  flex: 1;
+  height: 100%;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.03);
+  position: fixed;     /* fix sidebar */
+  top: 60px;           /* below header */
+  bottom: 0;
+  left: 0;
+  overflow-y: auto;    /* sidebar scrolls if long */
+  z-index: 999;
+}
+
+.sidebar .menu-label {
+  font-size: 0.75rem;
+  color: #999;
+  margin-bottom: 14px;
+  padding-left: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sidebar a {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  text-decoration: none;
+  color: #444;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.sidebar a i {
+  margin-right: 12px;
+  font-size: 1.1rem;
+  color: #777;
+  transition: color 0.3s;
+}
+
+.sidebar a:hover {
+  background: #f0f3ff;
+  color: #111;
+}
+
+.sidebar a:hover i {
+  color: #97c6d2;
+}
+
+.sidebar a.active {
+  background: #97c6d2;
+  color: #fff;
+  font-weight: 600;
+}
+
+.sidebar a.active i {
+  color: #fff;
+}
+
+/* Content */
+.content {
+  flex: 1;
+  margin-left: 240px;   /* beside sidebar */
+  margin-top: 60px;     /* below header */
+  background: #f9fafc;
+  padding: 0;           /* remove padding so iframe fits edge-to-edge */
+  overflow: hidden;     /* stop extra scrolls */
+  height: calc(100vh - 60px);
+  position: relative;
+}
+
+.content iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+.content h2 {
+  margin-bottom: 15px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #222;
+}
+
+.content p {
+  color: #555;
+  line-height: 1.6;
+}
+
+
+/* Pending Requests Panel */ 
+.pending-container {
+  width: 300px; /* or any width you prefer */
+  position: fixed; /* if you want it to stay on screen */
+  left: 0; /* align left */
+  top: 100px; /* adjust if you have a header */
+  background-color: #f9f9f9;
+  border: 2px solid #ccc; /* added border */
+  border-radius: 8px; /* optional: rounded corners */
+  border-right: 1px solid #ddd;
+  padding: 15px;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  z-index: 1000;
+}
+ 
+  #pendingPanel h3 { 
+    font-size: 1rem; 
+    font-weight: 600; 
+    margin-bottom: 15px; 
+    color: #222;
+} 
+    
+  #pendingPanel ul { 
+    list-style: none; 
+    padding: 0; 
+} 
+  #pendingPanel li { 
+    padding: 10px 12px; 
+    border-bottom: 1px solid #f0f0f0; 
+    font-size: 0.9rem; 
+    color: #444; 
+} #pendingPanel li:last-child { 
+    border-bottom: none; 
+  
+  }

@@ -1,0 +1,127 @@
+{# templates/pending_requests_list.html #}
+{% comment %} Professional, structured alignment for pending requests {% endcomment %}
+
+<style>
+  :root {
+    --brand: #97c6d2;
+    --bg: #ffffff;
+    --border: #e2e8f0;
+    --text-dark: #1e293b;
+    --text-muted: #64748b;
+    --radius: 10px;
+  }
+
+  #pendingList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-family: "Poppins", sans-serif;
+    font-size: 14px;
+  }
+
+  .pending-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: all 0.2s ease;
+  }
+
+  .pending-item:hover {
+    border-color: var(--brand);
+    background-color: #f9fcfe;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(151, 198, 210, 0.15);
+    cursor: pointer;
+  }
+
+  /* Left Section (Text) */
+  .pending-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .item-name {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 15px;
+    line-height: 1.3;
+  }
+
+  .meta {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .meta span {
+    margin-right: 8px;
+  }
+
+  /* Right Section (Priority Badge) */
+  .priority-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    align-self: center;
+  }
+
+  .priority-badge.high {
+    color: #b91c1c;
+    background: #fde8e8;
+    border-color: #f5c2c2;
+  }
+
+  .priority-badge.medium {
+    color: #92400e;
+    background: #fff4e6;
+    border-color: #ffd9b3;
+  }
+
+  .priority-badge.low {
+    color: #166534;
+    background: #e7f8ec;
+    border-color: #b3e6c5;
+  }
+
+  /* Empty State */
+  .pending-empty {
+    text-align: center;
+    padding: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+</style>
+
+{% for reservation in pending_request %}
+<li class="pending-item" data-id="{{ reservation.id }}">
+  <div class="pending-info">
+    <div class="item-name">{{ reservation.item.name }}</div>
+    <div class="meta">
+      <span>{{ reservation.userborrower.full_name|default:"Unknown" }}</span>
+      <span>•</span>
+      <span>{{ reservation.status|capfirst }}</span>
+    </div>
+  </div>
+
+  <div class="priority-badge {{ reservation.priority|lower }}">
+    {% if reservation.priority == "High" %}
+      High — Bereavement
+    {% elif reservation.priority == "Medium" %}
+      Medium — Event
+    {% else %}
+      Low — General
+    {% endif %}
+  </div>
+</li>
+{% empty %}
+<li class="pending-empty">No pending requests</li>
+{% endfor %}

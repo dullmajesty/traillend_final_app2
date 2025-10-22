@@ -1,0 +1,419 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="reports-wrap">
+  <header class="reports-header">
+    <h1>Reports</h1>
+  </header>
+
+  <form id="reportFilters" class="filters" onsubmit="return false;">
+    <div class="filter-group">
+      <label for="start">Start</label>
+      <input type="date" id="start" name="start">
+    </div>
+
+    <div class="filter-group">
+      <label for="end">End</label>
+      <input type="date" id="end" name="end">
+    </div>
+
+    <div class="filter-group">
+      <label for="items">Items</label>
+      <select id="items" name="items">
+        <option value="all">All Items</option>
+        {% for item in items %}
+        <option value="{{ item.id }}">{{ item.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="filter-actions">
+      <button id="generateBtn" class="btn btn-primary" type="button">Generate</button>
+      <button id="resetBtn" class="btn btn-ghost" type="button">Reset</button>
+    </div>
+  </form>
+
+  <section class="report-top">
+    <div class="card chart-card">
+      <canvas id="reportChart" aria-label="Borrowings chart" role="img"></canvas>
+    </div>
+
+    <aside class="card summary-card">
+      <h2>Summary</h2>
+      <dl>
+        <dt>Total Borrowings</dt>
+        <dd id="totalBorrowings">{{ total_borrowings|default:"0" }}</dd>
+
+        <dt>Most borrowed item</dt>
+        <dd id="mostItem">{{ most_borrowed_item|default:"—" }}</dd>
+
+        <dt>Top borrower</dt>
+        <dd id="topBorrower">{{ top_borrower|default:"—" }}</dd>
+      </dl>
+    </aside>
+  </section>
+
+  <section class="card transaction-card">
+    <div class="transaction-header">
+      <h2>Transactions</h2>
+      <div class="export-group">
+        <button id="exportCsv" class="btn btn-small" type="button">Export CSV</button>
+        <button id="exportExcel" class="btn btn-small" type="button">Export Excel</button>
+        <button id="exportPdf" class="btn btn-small" type="button">Export PDF</button>
+      </div>
+    </div>
+
+    <p class="muted">Showing transactions within the chosen date range</p>
+
+    <div class="table-wrap">
+      <table id="transactionsTable" class="transactions">
+        <thead>
+          <tr>
+            <th>Transaction ID</th>
+            <th>Item ID</th>
+            <th>Item Name</th>
+            <th>Borrower Name</th>
+            <th>Borrowed At</th>
+            <th>Returned At</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transactions %}
+          <tr>
+            <td>{{ t.transaction_id }}</td>
+            <td>{{ t.item_id }}</td>
+            <td>{{ t.item_name }}</td>
+            <td>{{ t.borrower_name }}</td>
+            <td>{{ t.borrowed_at }}</td>
+            <td>{{ t.returned_at }}</td>
+            <td>{{ t.status }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7">No transactions found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-- Chart.js (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+/* ---------- Chart setup (compact) ---------- */
+const canvas = document.getElementById('reportChart');
+canvas.style.display = 'block';
+canvas.style.maxHeight = '160px'; // enforce compact height
+
+const ctx = canvas.getContext('2d');
+
+const chartConfig = {
+  type: 'line',
+  data: {
+    labels: ["2025-08-03","2025-08-10","2025-08-12","2025-08-20"],
+    datasets: [{
+      label: 'Borrowings',
+      data: [4, 7, 9, 10], // sample values (counts) - replace from backend
+      borderWidth: 2,
+      borderColor: '#2b7cff',
+      pointRadius: 3,
+      backgroundColor: 'rgba(43,124,255,0.08)',
+      fill: true,
+      tension: 0.35
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { font: { size: 12 } }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { stepSize: 2, font: { size: 12 } },
+        grid: { color: 'rgba(0,0,0,0.05)' }
+      }
+    },
+    elements: { line: { borderJoinStyle: 'round' } }
+  }
+};
+
+let reportChart = new Chart(ctx, chartConfig);
+
+/* ---------- Helpers ---------- */
+function clearChart() {
+  reportChart.data.labels = [];
+  reportChart.data.datasets.forEach(ds => ds.data = []);
+  reportChart.update();
+}
+
+function populateMockData() {
+  // Example mock update — replace with real AJAX call to your Django view
+  const labels = ['2025-08-03','2025-08-06','2025-08-10','2025-08-15','2025-08-20'];
+  const data = labels.map((_,i) => Math.floor(Math.random()*10)+1);
+  reportChart.data.labels = labels;
+  reportChart.data.datasets[0].data = data;
+  reportChart.update();
+
+  // Update summary mock (replace with actual values)
+  document.getElementById('totalBorrowings').textContent = data.reduce((a,b)=>a+b,0);
+  document.getElementById('mostItem').textContent = 'Sample Item';
+  document.getElementById('topBorrower').textContent = 'Sample Borrower';
+}
+
+/* ---------- Buttons ---------- */
+document.getElementById('generateBtn').addEventListener('click', () => {
+  // You can: fetch('/reports/data?start=...&end=...&item=...') -> update chart with real data
+  populateMockData();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  // reset UI to initial state
+  reportChart.destroy();
+  reportChart = new Chart(ctx, chartConfig); // recreate with initial sample
+  document.getElementById('totalBorrowings').textContent = '{{ total_borrowings|default:"0" }}';
+  document.getElementById('mostItem').textContent = '{{ most_borrowed_item|default:"—" }}';
+  document.getElementById('topBorrower').textContent = '{{ top_borrower|default:"—" }}';
+});
+
+/* ---------- CSV export (simple) ---------- */
+function tableToCSV(table) {
+  const rows = Array.from(table.querySelectorAll('tr'));
+  return rows.map(row => {
+    const cells = Array.from(row.querySelectorAll('th,td'));
+    return cells.map(cell => '"' + cell.innerText.replace(/"/g,'""') + '"').join(',');
+  }).join('\n');
+}
+
+document.getElementById('exportCsv').addEventListener('click', () => {
+  const table = document.getElementById('transactionsTable');
+  const csv = tableToCSV(table);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'transactions.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+// exportExcel / exportPdf buttons - implement server-side or using libraries if needed
+document.getElementById('exportExcel').addEventListener('click', () => { alert('Use server export or a library like SheetJS for Excel.'); });
+document.getElementById('exportPdf').addEventListener('click', () => { alert('Use server-side PDF export or jsPDF for client-side PDFs.'); });
+
+</script>
+
+<style>
+
+.reports-wrap{
+  max-width: var(--maxwidth);
+  margin: 18px auto;
+  padding: 18px;
+  background: var(--bg);
+  border-radius: 10px;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #111827;
+  box-sizing: border-box;
+}
+
+/* Header */
+.reports-header h1{
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  letter-spacing: -0.2px;
+}
+
+/* Filters */
+.filters{
+  display:flex;
+  gap: var(--gap);
+  align-items:center;
+  flex-wrap:wrap;
+  margin-bottom: 14px;
+}
+
+.filter-group{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  font-size:13px;
+  padding:8px 10px;
+}
+
+.filter-group label{
+  font-weight:600;
+  color:#374151;
+}
+
+.filter-group input,
+.filter-group select{
+  padding:8px 10px;
+  border-radius:6px;
+  border:1px solid #e6e9ef;
+  background:#fff;
+  min-width:140px;
+  font-size:14px;
+  box-shadow: inset 0 1px 2px rgba(16,24,40,0.02);
+}
+
+/* Buttons */
+.filter-actions{
+  margin-left:auto;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.btn{
+  padding:8px 12px;
+  font-size:13px;
+  border-radius:6px;
+  border:1px solid transparent;
+  cursor:pointer;
+}
+
+.btn-primary{
+  background:var(--accent);
+  color: red/pink;
+  border-color: rgba(43,124,255,0.9);
+  box-shadow: 0 6px 12px rgba(43,124,255,0.08);
+}
+
+.btn-ghost{
+  background:transparent;
+  color:#374151;
+  border:1px solid #e6e9ef;
+}
+
+/* Top section: chart + summary */
+.report-top{
+  display:flex;
+  gap: var(--gap);
+  align-items:stretch;
+  margin-bottom: 16px;
+}
+
+/* Cards */
+.card{
+  background:var(--card);
+  border-radius: var(--radius);
+  padding:12px;
+  box-shadow: var(--shadow);
+}
+
+/* Chart card compact sizing */
+.chart-card{
+  flex: 2 1 60%;
+  min-width: 220px;
+  max-height: 180px;
+  display:flex;
+  align-items:stretch;
+  padding: 10px;
+}
+
+/* Force canvas to fit compact card */
+.chart-card canvas{
+  width:100% !important;
+  height: 160px !important;
+  display:block;
+}
+
+/* Summary card sized to match chart */
+.summary-card{
+  flex: 1 1 36%;
+  min-width: 180px;
+  padding:12px 14px;
+  font-size:14px;
+}
+
+.summary-card h2{
+  margin-top:0;
+  margin-bottom:8px;
+  font-size:16px;
+}
+
+.summary-card dl{ margin:0; }
+.summary-card dt{
+  color: #6b7280;
+  font-size:12px;
+  margin-top:8px;
+}
+.summary-card dd{
+  margin:2px 0 6px 0;
+  font-weight:600;
+  font-size:14px;
+}
+
+/* Transaction table */
+.transaction-card{
+  margin-top:6px;
+  border-radius:6px;
+}
+
+.transaction-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+
+.muted{ 
+    color:var(--muted); 
+    font-size:13px; 
+    margin:6px 0 0 0; }
+
+.table-wrap{
+  overflow:auto;
+  margin-top:10px;
+  border-radius:6px;
+}
+
+.transactions{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+  min-width:720px; /* keep table readable */
+}
+
+.transactions th, .transactions td{
+  border:1px solid #eef2f6;
+  padding:8px 10px;
+  text-align:center;
+  white-space:nowrap;
+}
+
+.transactions thead th{
+  background:#fbfdff;
+  color:#374151;
+  font-weight:700;
+  font-size:12px;
+  letter-spacing:0.2px;
+}
+
+.export-group .btn-small{
+  padding:6px 8px;
+  font-size:12px;
+  border-radius:6px;
+}
+
+/* Responsive: stack on small screens */
+@media (max-width:880px){
+  .report-top {
+    flex-direction:column;
+  }
+  .filter-actions{ margin-left:0; width:100%; justify-content:flex-start; }
+  .filters{ gap:10px; }
+  .transactions{ min-width:600px; }
+}
+</style>
+{% endblock %}

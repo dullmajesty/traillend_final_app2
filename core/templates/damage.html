@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="damage-report-container">
+    <!-- Left: Live Damage Report -->
+    <div class="damage-report-side">
+        <h3>Live Damage Report</h3>
+        <div id="report-details">
+            <p style="color:#9ca3af; font-style:italic;">Click a row to see details here...</p>
+        </div>
+    </div>
+
+    <!-- Right: Table + Search -->
+    <div class="damage-report-main">
+        <!-- Search -->
+        <div class="search-bar">
+            <input type="text" placeholder="Search text">
+        </div>
+
+        <!-- Total -->
+        <p>Total Damage Report: {{ reports|length }}</p>
+
+        <div class="table-wrapper">
+            <table class="damage-table">
+                <thead>
+                    <tr>
+                        <th>USER ID</th>
+                        <th>USER NAME</th>
+                        <th>ADDRESS</th>
+                        <th>IMAGE UPLOAD</th>
+                        <th>DATE SUBMITTED</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if reports %}
+                        {% for r in reports %}
+                        <tr class="report-row"
+                            data-user="{{ r.user_name }}"
+                            data-address="{{ r.address }}"
+                            data-image="{{ r.image }}"
+                            data-date="{{ r.date }}">
+                            <td>{{ r.user_id }}</td>
+                            <td>{{ r.user_name }}</td>
+                            <td>{{ r.address }}</td>
+                            <td>{{ r.image }}</td>
+                            <td>{{ r.date }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5">No Report</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Container Layout */
+.damage-report-container {
+    display: flex;
+    gap: 20px;
+    margin: 20px;
+    font-family: Arial, sans-serif;
+}
+
+/* Live Panel (left) */
+.damage-report-side {
+    flex: 1.5;
+    background: #f9f9f9;
+    border-right: 2px solid #ddd;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+/* Table Section (right) */
+.damage-report-main {
+    flex: 3;
+}
+
+/* Search Bar */
+.search-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 5px 10px;
+    background: #fff;
+}
+.search-bar input {
+    border: none;
+    outline: none;
+    flex: 1;
+    font-size: 14px;
+}
+.search-bar .search-icon {
+    color: #666;
+    font-size: 16px;
+}
+
+/* Table */
+.table-wrapper {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-top: 10px;
+}
+.damage-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.damage-table th {
+    text-align: left;
+    padding: 12px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    color: #374151;
+}
+.damage-table td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #374151;
+}
+.damage-table tr:hover {
+    background: #f3f4f6;
+    cursor: pointer;
+}
+.damage-table tr.active {
+    background: #dbeafe !important;
+}
+.damage-table td[colspan="5"] {
+    text-align: center;
+    font-style: italic;
+    color: #9ca3af;
+}
+</style>
+
+<!-- JS -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const rows = document.querySelectorAll(".report-row");
+    const details = document.getElementById("report-details");
+
+    rows.forEach(row => {
+        row.addEventListener("click", function () {
+            const user = this.getAttribute("data-user");
+            const address = this.getAttribute("data-address");
+            const image = this.getAttribute("data-image");
+            const date = this.getAttribute("data-date");
+
+            details.innerHTML = `
+                <p><strong>User:</strong> ${user}</p>
+                <p><strong>Address:</strong> ${address}</p>
+                <p><strong>Image:</strong> ${image}</p>
+                <p><strong>Date:</strong> ${date}</p>
+            `;
+        });
+    });
+});
+</script>
+{% endblock %}

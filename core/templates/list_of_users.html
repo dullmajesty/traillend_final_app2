@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="users-container">
+
+    <h2>Users List</h2>
+    <p>Total profiles: {{ profiles|length }}</p>
+
+
+    <!-- Filters -->
+    <div class="filters">
+        <input type="text" placeholder="Search name or email" id="searchText" onkeyup="filterTable()">
+        <select id="statusFilter" onchange="filterTable()">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+        </select>
+        <input type="date" id="fromDate" onchange="filterTable()">
+        <input type="date" id="toDate" onchange="filterTable()">
+        <select id="rowsFilter" onchange="filterTable()">
+            <option value="10">10 rows</option>
+            <option value="25">25 rows</option>
+            <option value="50">50 rows</option>
+        </select>
+    </div>
+
+    <!-- Users Table -->
+    <table id="usersTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Full Name</th>
+                <th>Username</th>
+                <th>Contact Number</th>
+                <th>Address</th>
+                <th>Status</th>
+                <th>Date Joined</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for profile in profiles %}
+            <tr>
+                <td>{{ profile.id }}</td>
+                <td>{{ profile.full_name }}</td>
+                <td>{{ profile.user.username }}</td>
+                <td>{{ profile.contact_number }}</td>
+                <td>{{ profile.address }}</td>
+                <td>
+                    {% if profile.user.is_active %}
+                        <span class="status active">Active</span>
+                    {% else %}
+                        <span class="status inactive">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>{{ profile.user.date_joined|date:"Y-m-d H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8">No users found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+.users-container {
+    padding: 15px;
+    font-size: 14px;
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.filters input, .filters select {
+    padding: 4px 6px;
+    font-size: 14px;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 6px;
+    text-align: center;
+}
+
+th {
+    background: #f7f7f7;
+}
+
+.status {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.status.active { background: #d4edda; color: #155724; }
+.status.inactive { background: #f8d7da; color: #721c24; }
+</style>
+
+<script>
+function filterTable() {
+    let input = document.getElementById('searchText').value.toLowerCase();
+    let statusFilter = document.getElementById('statusFilter').value;
+    let table = document.getElementById('usersTable');
+    let rows = table.getElementsByTagName('tr');
+
+    for (let i = 1; i < rows.length; i++) {
+        let cells = rows[i].getElementsByTagName('td');
+        if (!cells.length) continue;
+        let fullName = cells[1].textContent.toLowerCase();
+        let username = cells[2].textContent.toLowerCase();
+        let status = cells[6].textContent.toLowerCase();
+
+        let matchesSearch = fullName.includes(input) || username.includes(input);
+        let matchesStatus = !statusFilter || status.includes(statusFilter);
+
+        rows[i].style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+    }
+}
+</script>
+{% endblock %}

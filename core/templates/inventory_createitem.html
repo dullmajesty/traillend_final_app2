@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="card">
+  <h2>Create Item</h2>
+
+  <form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <!-- Item Image Preview (Left) + Item Image & Owner (Right) -->
+    <div class="form-row image-owner-row">
+      <div class="left-section">
+        <div class="image-preview">
+          <img id="preview" src="{% static 'placeholder.png' %}" alt="Image Preview">
+        </div>
+      </div>
+
+      <div class="right-section">
+        <div class="form-group">
+          <label for="itemImage">Item Image</label>
+          <input id="itemImage" name="item_image" type="file" accept="image/*" onchange="previewImage(event)">
+        </div>
+
+        <div class="form-group">
+          <label for="itemOwner">Item Owner</label>
+          <input id="itemOwner" name="item_owner" type="text" value="General Service Office" readonly>
+        </div>
+      </div>
+    </div>
+
+    <!-- Item Name + Status -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="itemName">Item Name</label>
+        <input id="itemName" name="item_name" type="text" placeholder="Enter item name" required>
+      </div>
+
+      <div class="form-group">
+        <label for="itemStatus">Status</label>
+        <select id="itemStatus" name="item_status" required>
+          <option value="Available" selected>Available</option>
+          <option value="Unavailable">Unavailable</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Quantity + Category -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="quantity">Quantity</label>
+        <input id="quantity" name="quantity" type="number" placeholder="Enter quantity" required>
+      </div>
+
+      <div class="form-group">
+        <label for="category">Category</label>
+        <select id="category" name="category">
+          <option disabled selected>Select category</option>
+          <option>Chairs</option>
+          <option>Tables</option>
+          <option>Tent</option>
+          <option>Venues</option>
+          <option>Sport Equipment</option>
+          <option>Cooling Ventilation</option>
+          <option>Water Supply</option>
+          <option>Electrical Accessories</option>
+          <option>Audio-Visual Equipment</option>
+          <option>Transportation</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" placeholder="Enter description"></textarea>
+    </div>
+
+    <!-- Submit -->
+    <button type="submit" class="btn">Save Item</button>
+  </form>
+</div>
+
+<style>
+/* General */
+body {
+  font-family: "Inter", sans-serif;
+  background: #f3f4f6;
+  margin: 0;
+}
+
+/* Card container */
+.card {
+  background: #ffffff;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  max-width: 750px;
+  margin: 20px auto;
+  transition: transform 0.2s ease;
+  margin-bottom: 25px;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
+/* Title */
+h2 {
+  text-align: center;
+  margin-bottom: 25px;
+  color: #1a1635;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+/* Form groups */
+.form-group {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make rows flex */
+.form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+/* Equal width for grouped inputs */
+.form-row .form-group {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+label {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+  font-size: 14px;
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 14px;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+  outline: none;
+}
+
+textarea {
+  resize: none;
+  min-height: 100px;
+}
+
+/* Image + Owner Row */
+.image-owner-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 20px;
+}
+
+/* Left section (preview) */
+.left-section {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.image-preview {
+  width: 220px;
+  height: 220px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+  overflow: hidden;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Right section (stacked vertically) */
+.right-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.right-section .form-group {
+  width: 100%;
+}
+
+/* Button */
+.btn {
+  display: block;
+  width: 100%;
+  background: #4f46e5;
+  color: white;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s, transform 0.1s;
+}
+
+.btn:hover {
+  background: #3730a3;
+  transform: scale(1.02);
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+</style>
+
+<script>
+function previewImage(event) {
+  const reader = new FileReader();
+  reader.onload = function () {
+    const output = document.getElementById('preview');
+    output.src = reader.result;
+  };
+  reader.readAsDataURL(event.target.files[0]);
+}
+</script>
+{% endblock %}

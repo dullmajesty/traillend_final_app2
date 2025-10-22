@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Reset Code</title>
+    <style>
+        /* Basic reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(to right, #4facfe, #00f2fe);
+        }
+
+        .card {
+            background-color: #ffffff;
+            padding: 40px 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 350px;
+            text-align: center;
+        }
+
+        h2 {
+            margin-bottom: 25px;
+            color: #333333;
+            font-size: 24px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555555;
+            text-align: left;
+        }
+
+        input[type="text"] {
+            padding: 12px;
+            border: 1px solid #cccccc;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        input[type="text"]:focus {
+            border-color: #4facfe;
+            outline: none;
+            box-shadow: 0 0 5px rgba(79,172,254,0.5);
+        }
+
+        button {
+            padding: 12px;
+            background-color: #4facfe;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #00f2fe;
+        }
+
+        .messages {
+            margin-bottom: 15px;
+        }
+
+        .messages li {
+            list-style: none;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .messages li.error {
+            background-color: #ffe5e5;
+            color: #d8000c;
+        }
+
+        .messages li.success {
+            background-color: #e5ffe5;
+            color: #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Verify Reset Code</h2>
+
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <label>Enter Code:</label>
+            <input type="text" name="code" placeholder="6-digit code" required autofocus>
+            <button type="submit" name="verify_code">Verify</button>
+        </form>
+
+        <form method="post" style="margin-top: 15px;">
+            {% csrf_token %}
+            <button type="submit" name="resend_code" style="background-color: #ff9800;">Resend Code</button>
+        </form>
+    </div>
+</body>
+</html>

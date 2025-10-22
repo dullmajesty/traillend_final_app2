@@ -1,0 +1,551 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="item-card detail-card">
+    <!-- Header -->
+    <div class="item-header">
+        <span class="item-id">Item ID: {{ item.id }}</span>
+        <span class="category-tag {{ item.category|slugify }}">{{ item.category }}</span>
+    </div>
+
+    <!-- Item Body -->
+    <div class="item-body">
+        <!-- Image -->
+        <div class="item-image">
+            {% if item.image %}
+                <img src="{{ item.image.url }}" alt="{{ item.name }}">
+            {% else %}
+                <img src="{% static 'images/default_item.png' %}" alt="Default">
+            {% endif %}
+        </div>
+
+        <!-- Details -->
+        <div class="item-details">
+            <h2>{{ item.name }}</h2>
+            <p><strong>Quantity:</strong> {{ item.qty }}</p>
+            <p><strong>Description:</strong> {{ item.description }}</p>
+        </div>
+
+        <!-- Calendar -->
+        <main class="cal" role="application" aria-label="Compact calendar">
+            <div class="cal-header">
+                <div>
+                    <div class="month" id="monthLabel">September 2025</div>
+                    <div style="font-size:12px;color:var(--muted)" id="yearLabel">2025</div>
+                </div>
+                <div class="controls">
+                    <button class="btn" id="prevBtn" aria-label="Previous month">◀</button>
+                    <button class="btn" id="todayBtn" aria-label="Go to today">Today</button>
+                    <button class="btn" id="nextBtn" aria-label="Next month">▶</button>
+                </div>
+            </div>
+
+            <div class="grid" id="weekdays">
+                <div class="weekday">Sun</div>
+                <div class="weekday">Mon</div>
+                <div class="weekday">Tue</div>
+                <div class="weekday">Wed</div>
+                <div class="weekday">Thu</div>
+                <div class="weekday">Fri</div>
+                <div class="weekday">Sat</div>
+            </div>
+
+            <div class="grid" id="daysGrid" style="margin-top:8px"></div>
+
+            <div class="footer">
+                <div id="selectedInfo">Click a day</div>
+                <div id="legend">
+                    <span style="display:inline-block;width:10px;height:10px;background:var(--today);border-radius:2px;margin-right:6px;vertical-align:middle"></span>
+                    today
+                </div>
+            </div>
+        </main> <!-- ✅ Properly closed calendar -->
+    </div>
+
+
+    <!-- Actions -->
+    <div class="item-actions">
+        <a href="{% url 'inventory' %}" class="btn-back">Back to Inventory</a>
+    </div>
+</div>
+
+<!-- Calendar -->
+  <div class="calendar" id="calendar"></div>
+
+  <!-- Modal -->
+<div class="modal" id="dateModal">
+  <div class="modal-content">
+    <span class="close" id="closeModal">&times;</span>
+
+    <!-- Reservation Panel -->
+    <div class="reservation-panel">
+      <h3 id="modalDate">Select a date</h3>
+
+      <label class="block-date">
+        <input type="checkbox" id="blockDate">
+        <span>Block this date</span>
+      </label>
+
+      <p class="note">
+        NOTE.<br>
+        Adjust your availability only if necessary.
+      </p>
+
+      <table class="reservation-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="reservationList">
+          <!-- Rows dynamically inserted -->
+        </tbody>
+      </table>
+
+      <div class="reservation-actions">
+        <button class="btn-save" id="blockBtn">BLOCK</button>
+        <button class="btn-close" id="cancelBtn">CANCEL</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+<!-- FullCalendar -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<style>
+/* ===== Card Container ===== */
+.detail-card {
+    max-width: 800px;
+    margin: 10px auto; 
+    padding: 28px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+}
+.detail-card:hover {
+    box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+}
+
+/* ===== Header ===== */
+.detail-card .item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+    font-weight: 600;
+    color: #444;
+}
+.detail-card .item-id {
+    font-size: 0.95rem;
+    color: #666;
+}
+.detail-card .category-tag {
+    padding: 6px 16px;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #4da6ff, #1a73e8);
+    text-transform: capitalize;
+    box-shadow: 0 2px 6px rgba(26, 115, 232, 0.25);
+}
+
+/* ===== Body ===== */
+.detail-card .item-body {
+    display: flex;
+    flex-wrap: wrap; /* responsive fallback */
+    gap: 20px;
+    margin-bottom: 28px;
+    align-items: flex-start;
+}
+
+.detail-card .item-image img {
+    width: 160px;
+    height: 160px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.detail-card .item-details {
+    flex: 1;
+    min-width: 200px;
+}
+
+.detail-card .calendar {
+    flex: 1;                 /* allow it to grow in the row */
+    min-width: 280px;        /* prevents being too small */
+    max-width: 100%;         /* no fixed limit that causes scroll */
+    overflow: visible;       /* remove scrollbars */
+}
+
+/* ===== Actions ===== */
+.item-actions {
+    display: flex;
+    justify-content: flex-end;  /* align to the right */
+    margin-top: 20px;
+}
+
+.btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1a73e8;
+    background: #f1f5f9;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.btn-back:hover {
+    background: #e2e8f0;
+    color: #0f5bd4;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+.btn-back:active {
+    transform: translateY(1px);
+}
+
+
+
+/* ===== Calendar ===== */
+
+.cal{
+    width:320px;
+    max-width:94vw;
+    background: #e6e8efaa;
+    border-radius:12px;
+    padding:12px;
+}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.month{font-weight:600;letter-spacing:0.2px}
+.controls{display:flex;gap:6px}
+.btn{background:transparent;border:0;color:var(--muted);padding:6px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.btn:active{transform:translateY(1px)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.weekday{font-size:11px;color:var(--muted);text-align:center}
+.day{height:36px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:transparent;font-weight:500;cursor:pointer;position:relative}
+.day:hover{background:rgba(255,255,255,0.03)}
+.day.out{opacity:0.2}
+.dot{width:6px;height:6px;border-radius:50%;position:absolute;bottom:6px;left:50%;transform:translateX(-50%);}
+.today{
+    background: #fb923c;
+    color: #2161e1ff;
+    box-shadow:0 4px 12px rgba(249,115,22,0.12)
+}
+.selected{outline:2px solid rgba(96,165,250,0.18);backdrop-filter:blur(4px)}
+.footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted);font-size:13px}
+
+/* ===== Modal Overlay ===== */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ===== Modal Content ===== */
+.modal-content {
+  background: #fff;
+  padding: 25px 30px;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.35);
+  position: relative;
+  animation: fadeInScale 0.3s ease;
+}
+
+/* Close Button */
+.close {
+  position: absolute;
+  top: 12px; right: 15px;
+  font-size: 22px;
+  font-weight: bold;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.close:hover {
+  color: #111827;
+}
+
+/* ===== Reservation Panel ===== */
+.reservation-panel h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #1f2937;
+  text-align: center;
+}
+
+.block-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #374151;
+}
+
+/* Blocked dates */
+.day.blocked {
+  text-decoration: line-through;
+  color: #ef4444;
+  cursor: not-allowed;
+  background: #fee2e2; /* light red */
+}
+.day.blocked:hover {
+  background: #fecaca;
+}
+
+/* Disabled (past dates) */
+.day.disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.note {
+  font-size: 13px;
+  color: #6b7280;
+  background: #f9fafb;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+/* ===== Table Styling ===== */
+.reservation-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.reservation-table th {
+  background: #f3f4f6;
+  padding: 10px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.reservation-table td {
+  padding: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #4b5563;
+}
+
+/* ===== Actions ===== */
+.reservation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-save {
+  background: #1e40af;
+  color: #fff;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.btn-save:hover {
+  background: #1e3a8a;
+}
+
+.btn-close {
+  background: #e11d48;
+  color: #fff;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.btn-close:hover {
+  background: #be123c;
+}
+
+/* ===== Animation ===== */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+
+</style>
+
+<script>
+(function(){
+    const monthLabel = document.getElementById('monthLabel');
+    const yearLabel = document.getElementById('yearLabel');
+    const daysGrid = document.getElementById('daysGrid');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const todayBtn = document.getElementById('todayBtn');
+    const selectedInfo = document.getElementById('selectedInfo');
+
+    const today = new Date();
+    let viewYear = today.getFullYear();
+    let viewMonth = today.getMonth(); // 0-indexed
+    let selectedDate = null;
+
+    const blockedDates = new Set(); // store blocked dates
+
+    function pad(n){return n<10?'0'+n:n}
+    function formatDate(y,m,d){return y+'-'+pad(m)+'-'+pad(d)}
+
+    function render(){
+        const first = new Date(viewYear,viewMonth,1);
+        const last = new Date(viewYear,viewMonth+1,0);
+        const startDay = first.getDay();
+        const totalDays = last.getDate();
+
+        monthLabel.textContent = first.toLocaleString(undefined,{month:'long'});
+        yearLabel.textContent = viewYear;
+
+        daysGrid.innerHTML = '';
+
+        const prevLast = new Date(viewYear,viewMonth,0).getDate();
+        for(let i=0;i<startDay;i++){
+            const d = prevLast - startDay + 1 + i;
+            const cell = dayCell(viewYear,viewMonth-1,d,true);
+            daysGrid.appendChild(cell);
+        }
+
+        for(let d=1;d<=totalDays;d++){
+            const cell = dayCell(viewYear,viewMonth,d,false);
+            daysGrid.appendChild(cell);
+        }
+
+        while(daysGrid.children.length < 42){
+            const d = daysGrid.children.length - (startDay + totalDays) + 1;
+            const cell = dayCell(viewYear,viewMonth+1,d,true);
+            daysGrid.appendChild(cell);
+        }
+    }
+
+    function dayCell(y, m, d, outside) {
+    const cell = document.createElement('button');
+    cell.className = 'day' + (outside ? ' out' : '');
+    cell.type = 'button';
+    const realMonth = new Date(y, m, d).getMonth();
+    const realYear = new Date(y, m, d).getFullYear();
+    cell.textContent = d;
+
+    const iso = formatDate(realYear, realMonth + 1, d);
+
+    // Highlight today
+    if (realYear === today.getFullYear() && realMonth === today.getMonth() && d === today.getDate()) {
+        cell.classList.add('today');
+    }
+
+    // Disable past dates
+    const now = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const current = new Date(realYear, realMonth, d);
+
+    if (current < now) {
+        cell.classList.add('disabled');
+        cell.disabled = true;
+        return cell; // ⛔ no click listener
+    }
+
+    // Disable blocked dates (unclickable but styled)
+    if (blockedDates.has(iso)) {
+        cell.classList.add('blocked');
+        cell.disabled = true;
+        return cell; // ⛔ no click listener
+    }
+
+    // Normal selectable date
+    cell.addEventListener('click', () => {
+        const prev = document.querySelector('.selected');
+        if (prev) prev.classList.remove('selected');
+        cell.classList.add('selected');
+        selectedDate = new Date(realYear, realMonth, d);
+        selectedInfo.textContent = selectedDate.toLocaleDateString(undefined, {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+
+        // Show modal
+        const modal = document.getElementById('dateModal');
+        const modalDate = document.getElementById('modalDate');
+        modal.style.display = "flex";
+        modalDate.textContent = selectedDate.toDateString();
+    });
+
+    return cell;
+}
+
+
+    prevBtn.addEventListener('click',()=>{ viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--} render(); });
+    nextBtn.addEventListener('click',()=>{ viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++} render(); });
+    todayBtn.addEventListener('click',()=>{ viewYear = today.getFullYear(); viewMonth = today.getMonth(); render(); const todays = document.querySelector('.today'); if(todays) { todays.click(); }});
+
+    render();
+
+    // Modal functionality
+    const modal = document.getElementById('dateModal');
+    const closeModal = document.getElementById('closeModal');
+    const blockBtn = document.getElementById('blockBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    closeModal.onclick = () => modal.style.display = "none";
+    window.onclick = (e) => { if(e.target === modal) modal.style.display = "none"; };
+
+    blockBtn.onclick = () => {
+        if(selectedDate){
+            const iso = formatDate(selectedDate.getFullYear(), selectedDate.getMonth()+1, selectedDate.getDate());
+            blockedDates.add(iso);
+            alert("Date blocked: " + selectedDate.toDateString());
+            render();
+        }
+        modal.style.display = "none";
+    };
+
+    cancelBtn.onclick = () => {
+        if(selectedDate){
+            alert("Reservation cancelled: " + selectedDate.toDateString());
+        }
+        modal.style.display = "none";
+    };
+})();
+
+</script>
+
+
+
+
+{% endblock %}

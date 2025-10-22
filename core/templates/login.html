@@ -1,0 +1,148 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Portal</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: url("{% static 'bkcover.png' %}");
+      background-size: cover;
+      font-family: Inter, sans-serif;
+    }
+    .card-wrapper {
+      position: relative;
+      width: 420px;
+      max-width: 90%;
+      background: white;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      display: block;
+    }
+    h2 {
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
+      color: #000;
+    }
+    .input-box {
+      width: 100%;
+      margin: 12px 0;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #D9D9D9;
+      box-shadow: 0 4px 4px rgba(0, 0, 0, 0.15);
+      font-size: 16px;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .password-wrapper {
+      position: relative;
+      width: 100%;
+    }
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+    }
+    .forgot {
+      display: block;
+      margin-top: 10px;
+      font-size: 14px;
+      color: #1F1B4F;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .forgot:hover {
+      text-decoration: underline;
+    }
+    .login-btn {
+      width: 100%;
+      padding: 12px;
+      margin-top:10px;
+      border-radius: 8px;
+      border: 1px solid #2C2C2C;
+      background: #FAB417;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .login-btn:hover {
+      background: #efc257;
+    }
+    .messages {
+      color: red;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card-wrapper">
+    <img src="{% static 'HULAM-ICON.png' %}" alt="HULAM-ICON-ICON" class="avatar">
+    <h2>Admin Portal</h2>
+
+    <!-- Display Django messages -->
+    {% if messages %}
+      <div class="messages">
+        {% for message in messages %}
+          <p>{{ message }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <!-- Django login form -->
+    <form method="post">
+      {% csrf_token %}
+      <input type="text" name="username" class="input-box" placeholder="Username" required>
+      <div class="password-wrapper">
+        <input type="password" id="password" name="password" class="input-box" placeholder="Password" required>
+        <button type="button" class="toggle-password" onclick="togglePassword()" aria-label="Show/Hide Password">
+          <i id="toggleIcon" class="fa-solid fa-eye"></i>
+        </button>
+      </div>
+      <a href="{% url 'forgot_password'%}">Forgot Password?</a>
+      <button type="submit" class="login-btn">Log In</button>
+    </form>
+  </div>
+
+  <script>
+    function togglePassword() {
+      const passwordField = document.getElementById("password");
+      const toggleIcon = document.getElementById("toggleIcon");
+
+      if (passwordField.type === "password") {
+        passwordField.type = "text";
+        toggleIcon.classList.remove("fa-eye");
+        toggleIcon.classList.add("fa-eye-slash");
+      } else {
+        passwordField.type = "password";
+        toggleIcon.classList.remove("fa-eye-slash");
+        toggleIcon.classList.add("fa-eye");
+      }
+    }
+  </script>
+</body>
+</html>

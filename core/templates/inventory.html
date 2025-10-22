@@ -1,0 +1,321 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{% load static %}
+
+<section class="inventory">
+  <h2>Inventory Management</h2>
+  <p>Track and manage your available items below.</p>
+
+  <!-- Top Controls -->
+  <div class="inventory-controls">
+    <div class="left-controls">
+      <form method="get" action="">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search items..." class="search-bar">
+
+        <select name="category" class="filter">
+          <option value="">All Categories</option>
+          <option value="Seating" {% if category == "Seating" %}selected{% endif %}>Seating</option>
+          <option value="Tables" {% if category == "Tables" %}selected{% endif %}>Tables</option>
+          <option value="Tent" {% if category == "Tent" %}selected{% endif %}>Tent</option>
+          <option value="Venues" {% if category == "Venues" %}selected{% endif %}>Venues</option>
+          <option value="Sport Equipment" {% if category == "Sport Equipment" %}selected{% endif %}>Sport Equipment</option>
+          <option value="Cooling Ventilation" {% if category == "Cooling Ventilation" %}selected{% endif %}>Cooling Ventilation</option>
+          <option value="Water Supply" {% if category == "Water Supply" %}selected{% endif %}>Water Supply</option>
+          <option value="Electrical Accessories" {% if category == "Electrical Accessories" %}selected{% endif %}>Electrical Accessories</option>
+          <option value="Audio-Visual Equipment" {% if category == "Audio-Visual Equipment" %}selected{% endif %}>Audio-Visual Equipment</option>
+          <option value="Transportation" {% if category == "Transportation" %}selected{% endif %}>Transportation</option>
+        </select>
+
+
+
+        <select name="status" class="filter">
+          <option value="">All Status</option>
+          <option value="Available" {% if status == "Available" %}selected{% endif %}>Available</option>
+          <option value="Not Available" {% if status == "Not Available" %}selected{% endif %}>Not Available</option>
+        </select>
+
+        <select name="sort" class="sort">
+          <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
+          <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest</option>
+        </select>
+
+        <button type="submit" class="btn small">Apply</button>
+         <a href="{% url 'inventory-createitem' %}" class="btn add">
+            <i class="fas fa-plus"></i> Create New Item
+        </a>
+      </form>
+    </div>
+
+    <div class="right-controls">
+      <span class="total-items">Total Items: <strong>{{ total_items }}</strong></span>
+    </div>
+  </div>
+</section>
+
+<section class="inventory-cards">
+  {% if items %}
+    {% for item in items %}
+      <div class="card">
+        <!-- Category badge -->
+        <div class="category 
+            {% if item.category == 'Seating' %}category-seating{% endif %}
+            {% if item.category == 'Tables' %}category-tables{% endif %}
+            {% if item.category == 'Tent' %}category-tent{% endif %}
+            {% if item.category == 'Venues' %}category-venues{% endif %}
+            {% if item.category == 'Sport Equipment' %}category-sport-equipment{% endif %}
+            {% if item.category == 'Cooling Ventilation' %}category-cooling-ventilation{% endif %}
+            {% if item.category == 'Water Supply' %}category-water-supply{% endif %}
+            {% if item.category == 'Electrical Accessories' %}category-electrical-accessories{% endif %}
+            {% if item.category == 'Audio-Visual Equipment' %}category-audio-visual-equipment{% endif %}
+            {% if item.category == 'Transportation' %}category-transportation{% endif %}
+        ">
+            {{ item.category }}
+        </div>
+        
+        {% if item.image %}
+          <img src="{{ item.image.url }}" alt="{{ item.name }}">
+        {% else %}
+          <img src="{% static 'images/item.png' %}" alt="{{ item.name }}">
+        {% endif %}
+
+        <h3>{{ item.name }}</h3>
+        <p><strong>Qty:</strong> {{ item.qty }}</p>
+        <p><strong>Owner:</strong> {{ item.owner }}</p>
+        <p><strong>Status:</strong> {{ item.status }}</p>
+
+        <div class="card-actions">
+            <a href="{% url 'inventory_edit' item.item_id %}" class="btn edit">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="{% url 'inventory_detail' item.item_id %}" class="btn details">
+                <i class="fas fa-info-circle"></i> Details
+            </a>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No items yet.</p>
+  {% endif %}
+</section>
+
+
+
+
+<style>
+/* Inventory Page */
+
+/* Card Grid */
+.inventory-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  margin: 40px 20px 20px 20px; /* top, right, bottom, left */
+  padding: 12px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 15px;
+  text-align: center;
+  border: none;
+  box-shadow:
+    0 4px 8px rgba(0,0,0,0.08),
+    0 6px 20px rgba(0,0,0,0.12);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  position: relative;
+}
+
+.card:hover {
+  transform: translateY(-8px);
+  box-shadow:
+    0 8px 16px rgba(0,0,0,0.12),
+    0 12px 30px rgba(0,0,0,0.18);
+}
+
+/* Card Badge */
+.card .category {
+  padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* Colors per category – Pastel version */
+.category-seating { background-color: #A0E7E5; }           /* pastel teal */
+.category-tables { background-color: #FFD6A5; }           /* pastel orange */
+.category-tent { background-color: #ffffbaff; color: black; } /* pastel yellow */
+.category-venues { background-color: #CBAACB; }           /* pastel purple */
+.category-sport-equipment { background-color: #B5EAD7; }   /* pastel green */
+.category-cooling-ventilation { background-color: #CAF7E3; color: black; } /* pastel cyan */
+.category-water-supply { background-color: #AEDFF7; }      /* pastel blue */
+.category-electrical-accessories { background-color: #FFB3BA; } /* pastel red/pink */
+.category-audio-visual-equipment { background-color: #E0E0E0; color: black; } /* pastel gray */
+.category-transportation { background-color: #D4F1BE; color: black; } /* pastel light green */
+
+
+/* Image */
+.card img {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin: 15px auto;
+  display: block;
+}
+
+/* Title */
+.card h3 {
+  font-size: 1.1rem;
+  margin: 8px 0;
+  color: #333;
+}
+
+/* Quantity */
+.card p {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Actions */
+.card-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.card .btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.card .btn.details {
+  background: #eee;
+  color: #333;
+}
+
+.card .btn.edit {
+  background: #222;
+  color: #fff;
+}
+
+.inventory {
+  padding: 20px;
+}
+
+.inventory-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 15px 0 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.left-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.search-bar {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.filter, .sort {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.right-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.total-items {
+  font-size: 0.95rem;
+  color: #333;
+}
+
+/* Applies to both <button> and <a> */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.3s;
+  text-decoration: none; /* <— removes underline for links */
+  color: inherit;        /* <— ensures text uses button color */
+}
+
+
+/* Specific button styles */
+.btn.add {
+  background: #4CAF50;
+  color: white;
+}
+
+.btn.export {
+  background: #2196F3;
+  color: white;
+}
+
+.btn.small {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.btn.danger {
+  background: #f44336;
+  color: white;
+}
+
+.btn:hover {
+  opacity: 0.85;
+}
+
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  background: #fff;
+  border: 1px solid #ddd;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.inventory-table th {
+  background: #f8f9fb;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.inventory-table tr:hover {
+  background: #f9f9f9;
+}
+
+
+</style>
+{% endblock %}
