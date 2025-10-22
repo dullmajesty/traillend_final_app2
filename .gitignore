@@ -1,0 +1,3 @@
+# Ignore Firebase and other sensitive keys
+firebase_key.json
+*.env
