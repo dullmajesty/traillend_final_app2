@@ -1,7 +1,5 @@
 {% extends 'base.html' %}
 
-
-
 {% block content %}
 <section class="dashboard">
   <h2>Welcome to TrailLend</h2>
@@ -14,19 +12,19 @@
   <div class="cards">
     <div class="card">
       <h3>Total Users</h3>
-      <p id="totalUsers"></p>
+      <p>{{ total_users }}</p>
     </div>
     <div class="card">
       <h3>Total Items</h3>
-      <p id="totalItems"></p>
+      <p>{{ total_items }}</p>
     </div>
     <div class="card">
       <h3>Total Transaction</h3>
-      <p id="totalTransaction"></p>
+      <p>{{ total_transactions }}</p>
     </div>
     <div class="card">
       <h3>Total Borrowed</h3>
-      <p id="totalBorrowed"></p>
+      <p>{{ total_borrowed }}</p>
     </div>
   </div>
 

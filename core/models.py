@@ -60,3 +60,25 @@ class Reservation(models.Model):
     def __str__(self):
         return f"{self.item.name} - {self.date} - {self.status}"
 
+class Notification(models.Model):
+    user = models.ForeignKey(UserBorrower, on_delete=models.CASCADE)
+    title = models.CharField(max_length=100)
+    message = models.TextField()
+    qr_code = models.ImageField(upload_to='qr_codes/', null=True, blank=True)
+    type = models.CharField(max_length=50, default='general')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.full_name} - {self.title}"
+    
+class DeviceToken(models.Model):
+    user = models.ForeignKey(UserBorrower, on_delete=models.CASCADE)
+    token = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.full_name} - {self.token[:20]}..."

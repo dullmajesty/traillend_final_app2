@@ -1,126 +1,134 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Verify Reset Code</title>
-    <style>
-        /* Basic reset */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password - TrailLend</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background: linear-gradient(to right, #4facfe, #00f2fe);
-        }
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: url("{% static 'bkcover.png' %}");
+      background-size: cover;
+      font-family: 'Poppins', sans-serif;
+    }
 
-        .card {
-            background-color: #ffffff;
-            padding: 40px 30px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            width: 350px;
-            text-align: center;
-        }
+    .reset-container {
+      background: #fff;
+      padding: 35px 30px;
+      border-radius: 10px;
+      width: 400px;
+      max-width: 90%;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      text-align: center;
+      position: relative;
+    }
 
-        h2 {
-            margin-bottom: 25px;
-            color: #333333;
-            font-size: 24px;
-        }
+    h2 {
+      margin-bottom: 15px;
+      color: #000;
+      font-size: 22px;
+      font-weight: 600;
+    }
 
-        form {
-            display: flex;
-            flex-direction: column;
-        }
+    .input-box {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin: 10px 0;
+      font-size: 15px;
+      outline: none;
+    }
 
-        label {
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #555555;
-            text-align: left;
-        }
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      background-color: #FAB417;
+      color: #fff;
+      font-size: 15px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
 
-        input[type="text"] {
-            padding: 12px;
-            border: 1px solid #cccccc;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 16px;
-        }
+    .btn:hover {
+      background-color: #efc257;
+    }
 
-        input[type="text"]:focus {
-            border-color: #4facfe;
-            outline: none;
-            box-shadow: 0 0 5px rgba(79,172,254,0.5);
-        }
+    .popup {
+      position: fixed;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #4BB543;
+      color: white;
+      padding: 15px 25px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 15px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 9999;
+    }
 
-        button {
-            padding: 12px;
-            background-color: #4facfe;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
+    .popup.show {
+      display: block;
+      animation: fadeInOut 3s ease;
+    }
 
-        button:hover {
-            background-color: #00f2fe;
-        }
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translate(-50%, -20px); }
+      10%, 90% { opacity: 1; transform: translate(-50%, 0); }
+      100% { opacity: 0; transform: translate(-50%, -20px); }
+    }
 
-        .messages {
-            margin-bottom: 15px;
-        }
-
-        .messages li {
-            list-style: none;
-            padding: 10px;
-            border-radius: 6px;
-            margin-bottom: 8px;
-        }
-
-        .messages li.error {
-            background-color: #ffe5e5;
-            color: #d8000c;
-        }
-
-        .messages li.success {
-            background-color: #e5ffe5;
-            color: #4caf50;
-        }
-    </style>
+  </style>
 </head>
+
 <body>
-    <div class="card">
-        <h2>Verify Reset Code</h2>
+  <div class="reset-container">
+    <h2>Reset Password</h2>
 
-        {% if messages %}
-            <ul class="messages">
-                {% for message in messages %}
-                    <li class="{{ message.tags }}">{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
+    {% if messages %}
+      {% for message in messages %}
+        <div id="popupMessage" class="popup">{{ message }}</div>
+        <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            const popup = document.getElementById('popupMessage');
+            popup.classList.add('show');
+            if ("{{ message.tags }}" === "success") {
+              setTimeout(() => {
+                window.location.href = "{% url 'login' %}";
+              }, 20000);  // Redirect after 2 seconds
+            }
+          });
+        </script>
+      {% endfor %}
+    {% endif %}
 
-        <form method="post">
-            {% csrf_token %}
-            <label>Enter Code:</label>
-            <input type="text" name="code" placeholder="6-digit code" required autofocus>
-            <button type="submit" name="verify_code">Verify</button>
-        </form>
+    <form method="post">
+      {% csrf_token %}
+      <label><strong>New Password</strong></label>
+      <input type="password" name="new_password" class="input-box" placeholder="Enter new password" required>
 
-        <form method="post" style="margin-top: 15px;">
-            {% csrf_token %}
-            <button type="submit" name="resend_code" style="background-color: #ff9800;">Resend Code</button>
-        </form>
-    </div>
+      <label><strong>Confirm Password</strong></label>
+      <input type="password" name="confirm_password" class="input-box" placeholder="Confirm new password" required>
+
+      <button type="submit" class="btn">Reset Password</button>
+    </form>
+
+    <p style="margin-top: 10px; font-size: 14px;">
+      <a href="{% url 'login' %}">Back to Login</a>
+    </p>
+  </div>
 </body>
 </html>

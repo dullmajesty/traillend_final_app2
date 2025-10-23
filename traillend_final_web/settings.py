@@ -11,6 +11,21 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+# ==============================
+# 🔥 FIREBASE ADMIN CONFIG
+# ==============================
+import os
+import firebase_admin
+from firebase_admin import credentials
+
+# Absolute path to firebase_key.json
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIREBASE_KEY_PATH = os.path.join(BASE_DIR, 'firebase_key.json')
+
+# Initialize Firebase only once
+if not firebase_admin._apps:
+    cred = credentials.Certificate(FIREBASE_KEY_PATH)
+    firebase_admin.initialize_app(cred)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +40,7 @@ SECRET_KEY = 'django-insecure-g%ec9@2x9!z^j=w$ssd4+n_3+o!hwg1op&-9^4@yo$s#i1)5n6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["192.168.1.8", "127.0.0.1", "localhost", "192.168.43.118", "192.168.151.217"]
+ALLOWED_HOSTS = ['192.168.151.115', 'localhost', '127.0.0.1']
 
 
 
@@ -38,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'core',
     'corsheaders',
 ]
@@ -89,12 +105,12 @@ WSGI_APPLICATION = 'traillend_final_web.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'hulam_db2',       # your database name
-        'USER': 'root',            # default XAMPP user
-        'PASSWORD': '',            # default XAMPP password is empty
-        'HOST': '127.0.0.1',       # localhost
-        'PORT': '3306',            # default MySQL port
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'traillend_db',
+        'USER': 'capstone',
+        'PASSWORD': 'okipuhaha',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
@@ -146,5 +162,14 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
+
+# ✅ Email configuration (Gmail SMTP)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'traillendsystem@gmail.com'
+EMAIL_HOST_PASSWORD = 'vityemepzgqcdamk'
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

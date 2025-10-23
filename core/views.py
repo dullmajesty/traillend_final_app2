@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated #neww
 from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.template.loader import render_to_string
@@ -30,6 +31,28 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
+#notifications
+import qrcode
+from io import BytesIO
+from django.core.files.base import ContentFile
+from firebase_admin import messaging
+from .models import DeviceToken, Notification
+from .models import Notification
+
+
+#FORGOT PASSWORD
+from django.core.mail import send_mail
+from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.conf import settings
+import random
+
+
+#logout
+from django.shortcuts import redirect
+from django.contrib.auth import logout as auth_logout
+
+from .models import Notification, DeviceToken
 
 # -----------------------
 # Web views (templates)
@@ -57,15 +80,126 @@ def admin_login(request):
 @ensure_csrf_cookie
 @login_required
 def dashboard(request):
-    return render(request, "dashboard.html")
+    total_users = UserBorrower.objects.count()
+    total_items = Item.objects.count()
+    total_transactions = Reservation.objects.count()
+    total_borrowed = Reservation.objects.filter(status='approved').count()
+
+    context = {
+        'total_users': total_users,
+        'total_items': total_items,
+        'total_transactions': total_transactions,
+        'total_borrowed': total_borrowed,
+    }
+
+    return render(request, "dashboard.html", context)
 
 
+#NEW
 def forgot_password(request):
-    return render(request, "forgot_password.html")
+    show_code_container = False
+    email_value = ""  # store email to keep it in the input
 
+    if request.method == 'POST':
+        # When admin clicks "Send Reset Code"
+        if 'send_code' in request.POST:
+            email = request.POST.get('email')
+            email_value = email  # keep value for re-render
 
+            try:
+                user = User.objects.get(email=email)
+                code = random.randint(100000, 999999)
+                request.session['reset_email'] = email
+                request.session['reset_code'] = str(code)
+
+                send_mail(
+                    subject="TrailLend Password Reset Code",
+                    message=f"Your password reset code is {code}. Please use this code to verify your identity.",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+
+                messages.success(request, "A reset code has been sent to your email. Please check your inbox.")
+                show_code_container = True
+
+            except User.DoesNotExist:
+                messages.error(request, "This email doesn't exist.")
+
+        # When admin clicks "Verify Code"
+        elif 'verify_code' in request.POST:
+            input_code = request.POST.get('reset_code')
+            session_code = request.session.get('reset_code')
+            email_value = request.session.get('reset_email', '')
+
+            if input_code == session_code:
+                messages.success(request, "Code verified successfully! You can now reset your password.")
+                return redirect('verify_reset_code')
+            else:
+                messages.error(request, "Invalid or incorrect code.")
+                show_code_container = True
+
+        # When admin clicks "Resend Code"
+        elif 'resend_code' in request.POST:
+            email = request.session.get('reset_email')
+            email_value = email
+            if email:
+                code = random.randint(100000, 999999)
+                request.session['reset_code'] = str(code)
+                send_mail(
+                    subject="TrailLend Password Reset Code (Resent)",
+                    message=f"Your new password reset code is {code}.",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+                messages.success(request, "A new code has been sent to your email.")
+                show_code_container = True
+            else:
+                messages.error(request, "No email session found. Please enter your email again.")
+
+    return render(request, "forgot_password.html", {
+        'show_code_container': show_code_container,
+        'email': email_value or request.session.get('reset_email', '')
+    })
+
+#NEW
 def verify_reset_code(request):
-    return render(request, "verify_reset_code.html")
+    """
+    Page for entering a new password after verifying the reset code.
+    """
+    email = request.session.get('reset_email')
+
+    if not email:
+        messages.error(request, "Session expired. Please enter your email again.")
+        return redirect('forgot_password')
+
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
+
+        if not new_password or not confirm_password:
+            messages.error(request, "Please fill in all fields.")
+        elif new_password != confirm_password:
+            messages.error(request, "Passwords do not match.")
+        else:
+            try:
+                user = User.objects.get(email=email)
+                user.set_password(new_password)
+                user.save()
+
+                # Clear session data
+                request.session.pop('reset_email', None)
+                request.session.pop('reset_code', None)
+
+                # ✅ Show success message (used by popup)
+                messages.success(request, "Your password has been successfully changed.")
+                return render(request, "verify_reset_code.html")
+
+            except User.DoesNotExist:
+                messages.error(request, "User not found. Please try again.")
+
+    return render(request, "verify_reset_code.html", {"email": email})
 
 
 def inventory(request):
@@ -224,7 +358,8 @@ def list_of_users(request):
 
 
 def logout(request):
-    return render(request, 'logout.html')
+    auth_logout(request)
+    return redirect('login')
 
 
 # -----------------------
@@ -357,14 +492,15 @@ def reservation_detail_api(request, pk: int):
 @authentication_classes([SessionAuthentication, JWTAuthentication])
 @permission_classes([IsAuthenticated])
 def reservation_update_api(request, pk: int):
+    from django.conf import settings
     r = get_object_or_404(Reservation, pk=pk)
     new_status = (request.data or {}).get('status')
 
-    # align with model: rejected (not declined)
     allowed = {'approved', 'rejected', 'borrowed', 'returned', 'pending'}
     if new_status not in allowed:
         return Response({'status': 'error', 'message': 'Invalid status'}, status=400)
 
+    # Update dates based on new status
     if new_status == 'approved' and hasattr(r, 'approved_at'):
         r.approved_at = timezone.now()
     if new_status == 'borrowed' and hasattr(r, 'date_receive'):
@@ -374,7 +510,50 @@ def reservation_update_api(request, pk: int):
 
     r.status = new_status
     r.save()
+
+    # 🧩 If approved — generate QR + create notification + send push
+    if new_status == 'approved':
+        # 1️⃣ Generate QR Code
+        qr_data = f"""
+        Transaction ID: {r.transaction_id}
+        Borrower: {r.userborrower.full_name}
+        Item: {r.item.name}
+        Quantity: {r.quantity}
+        Date: {r.date}
+        Contact: {r.contact}
+        """
+        qr_img = qrcode.make(qr_data)
+        buffer = BytesIO()
+        qr_img.save(buffer, format='PNG')
+        qr_file = ContentFile(buffer.getvalue(), f"qr_{r.transaction_id}.png")
+
+        # 2️⃣ Create Notification entry
+        notif = Notification.objects.create(
+            user=r.userborrower,
+            title="Reservation Approved",
+            message=f"Your reservation for {r.item.name} has been approved! Show this QR code to the admin upon claiming.",
+            type="approval"
+        )
+        notif.qr_code.save(f"qr_{r.transaction_id}.png", qr_file)
+        notif.save()
+
+        # 3️⃣ Send Push Notification (if token exists)
+        try:
+            token_entry = DeviceToken.objects.filter(user=r.userborrower).last()
+            if token_entry:
+                message = messaging.Message(
+                    notification=messaging.Notification(
+                        title="Request Approved ✅",
+                        body=f"Your QR code for {r.item.name} is ready!"
+                    ),
+                    token=token_entry.token,
+                )
+                messaging.send(message)
+        except Exception as e:
+            print("Error sending push notification:", e)
+
     return Response({'status': 'success'})
+
 
 
 
@@ -507,6 +686,7 @@ class CheckAvailabilityView(APIView):
 
 
 
+#UPDATED
 
 class CreateReservationView(APIView):
     permission_classes = [IsAuthenticated]
@@ -544,10 +724,12 @@ class CreateReservationView(APIView):
         if reserved + qty > item.qty:
             suggestions = find_next_available_dates(item, qty, reserve_date, 30, 3)
             return Response(
-                {"detail": "Requested date is not available.",
-                 "blocked": [reserve_date.isoformat()],
-                 "suggestions": suggestions},
-                status=409
+                {
+                    "detail": "Requested date is not available.",
+                    "blocked": [reserve_date.isoformat()],
+                    "suggestions": suggestions,
+                },
+                status=409,
             )
 
         # ✅ files & contact
@@ -555,6 +737,7 @@ class CreateReservationView(APIView):
         id_file = request.FILES.get("valid_id_image")
         contact = data.get("contact") or borrower.contact_number or "N/A"
 
+        # ✅ Create Reservation
         r = Reservation.objects.create(
             item=item,
             userborrower=borrower,
@@ -562,15 +745,26 @@ class CreateReservationView(APIView):
             date=reserve_date,
             message=message,
             priority=priority,
-            letter_image=letter_file,          # ImageField from request.FILES
-            valid_id_image=id_file,            # "
+            letter_image=letter_file,
+            valid_id_image=id_file,
             contact=contact,
             status='pending',
         )
         r.transaction_id = f"T{r.id:06d}"
         r.save(update_fields=["transaction_id"])
 
-        return Response({"id": r.id, "transaction_id": r.transaction_id, "status": r.status}, status=201)
+        # ✅ Create Pending Notification
+        create_notification(
+            borrower,
+            title="Pending Reservation 🕒",
+            message=f"Your reservation for {item.name} is pending admin approval.",
+            notif_type="pending"
+        )
+
+        return Response(
+            {"id": r.id, "transaction_id": r.transaction_id, "status": r.status},
+            status=201,
+        )
 
 
 @csrf_exempt
@@ -656,3 +850,147 @@ def update_profile(request):
         except Exception as e:
             return JsonResponse({"success": False, "message": str(e)}, status=400)
     return JsonResponse({"success": False, "message": "Invalid request method"}, status=405)
+
+
+# NEW
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_device_token(request):
+    """Save or update the borrower's device token."""
+    user = request.user
+    token = request.data.get('token')
+
+    if not token:
+        return Response({'success': False, 'message': 'Token required'}, status=400)
+
+    DeviceToken.objects.update_or_create(user=user, defaults={'token': token})
+    return Response({'success': True, 'message': 'Token saved'})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_notifications(request):
+    """Return list of notifications for the logged-in borrower."""
+    user = request.user
+    borrower = getattr(user, 'userborrower', None)
+    if not borrower:
+        return Response({'success': True, 'notifications': []}, status=200)
+
+
+    notifications = Notification.objects.filter(user=borrower).order_by('-created_at')
+    data = [
+        {
+            'id': n.id,
+            'title': n.title,
+            'message': n.message,
+            'type': n.type,
+            'qr_code': request.build_absolute_uri(n.qr_code.url) if n.qr_code else None,
+            'is_read': n.is_read,
+            'created_at': n.created_at.strftime('%Y-%m-%d %H:%M'),
+        }
+        for n in notifications
+    ]
+    return Response({'success': True, 'notifications': data}, status=200)
+
+
+def create_notification(borrower, title, message, notif_type='general', qr_file=None):
+    """Reusable helper to create both in-app + push notification."""
+    notif = Notification.objects.create(
+        user=borrower,
+        title=title,
+        message=message,
+        type=notif_type
+    )
+
+    if qr_file:
+        notif.qr_code.save(f"qr_{borrower.user.username}.png", qr_file)
+
+    # 🔔 Optional push notification
+    try:
+        token_entry = DeviceToken.objects.filter(user=borrower.user).last()
+        if token_entry:
+            push_message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=message
+                ),
+                token=token_entry.token,
+            )
+            messaging.send(push_message)
+    except Exception as e:
+        print("⚠️ Error sending push notification:", e)
+
+    return notif
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def mark_notification_as_read(request, pk):
+    """
+    Marks a specific notification as read (is_read=True)
+    """
+    try:
+        notif = Notification.objects.get(pk=pk, user__user=request.user)
+        notif.is_read = True
+        notif.save()
+        return Response({'success': True, 'message': 'Notification marked as read'})
+    except Notification.DoesNotExist:
+        return Response({'success': False, 'message': 'Notification not found'}, status=404)
+    
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_reservations(request):
+    borrower = getattr(request.user, 'userborrower', None)
+    if not borrower:
+        return Response({'success': False, 'reservations': []})
+
+    reservations = Reservation.objects.filter(userborrower=borrower).select_related('item').order_by('-created_at')
+
+    data = []
+    for r in reservations:
+        image_url = request.build_absolute_uri(r.item.image.url) if r.item and r.item.image else None
+        data.append({
+            'id': r.id,
+            'transaction_id': r.transaction_id,
+            'item_name': r.item.name if r.item else '',
+            'quantity': r.quantity,
+            'date': r.date.strftime('%Y-%m-%d'),
+            'status': r.status,
+            'priority': r.priority,
+            'message': r.message or '',
+            'image_url': image_url,  # ✅ include image
+        })
+
+    return Response({'success': True, 'reservations': data}, status=200)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def cancel_reservation(request, pk):
+    """
+    Allows the borrower to cancel their own pending reservation.
+    """
+    borrower = getattr(request.user, 'userborrower', None)
+    if not borrower:
+        return Response({'success': False, 'message': 'Unauthorized user.'}, status=403)
+
+    try:
+        reservation = Reservation.objects.get(pk=pk, userborrower=borrower)
+
+        if reservation.status != 'pending':
+            return Response({'success': False, 'message': 'Only pending reservations can be cancelled.'}, status=400)
+
+        reservation.status = 'cancelled'
+        reservation.save()
+
+        # ✅ Create Cancellation Notification
+        create_notification(
+            borrower,
+            title="Reservation Cancelled ❌",
+            message=f"You cancelled your reservation for {reservation.item.name}.",
+            notif_type="cancelled"
+        )
+
+        return Response({'success': True, 'message': 'Reservation cancelled successfully.'}, status=200)
+    except Reservation.DoesNotExist:
+        return Response({'success': False, 'message': 'Reservation not found.'}, status=404)
