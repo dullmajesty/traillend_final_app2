@@ -33,56 +33,64 @@
     </select>
   </div>
 
-  <!-- Table -->
-  <div class="table-wrapper">
-    <table class="history-table">
-      <thead>
-        <tr>
-          <th>Transaction ID</th>
-          <th>User Name</th>
-          <th>Item Name</th>
-          <th>Date &amp; Time Receive</th>
-          <th>Date &amp; Time Returned</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for t in transactions %}
-        <tr>
-          <td class="txid">{{ t.transaction_id }}</td>
-          <td class="user">{{ t.user_name }}</td>
-          <td class="item">{{ t.item_name }}</td>
-
-          {# If these are datetimes, the date filter outputs "" for None, so default works #}
-          <td class="receive">
-            {{ t.date_receive|date:"Y-m-d H:i"|default:"—" }}
-          </td>
-          <td class="returned">
-            {{ t.date_returned|date:"Y-m-d H:i"|default:"—" }}
-          </td>
-
-          <td class="status">
-            <span class="badge badge-{{ t.status|lower }}">{{ t.status|capfirst }}</span>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="6" style="text-align:center;color:#6b7280;">No transactions found.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+ <!-- Table -->
+<div class="table-wrapper">
+  <table class="history-table">
+    <thead>
+      <tr>
+        <th>Transaction ID</th>
+        <th>User Name</th>
+        <th>Item Name</th>
+        <th>Quantity</th>
+        <th>Contact</th>
+        <th>Date Reserved</th>
+        <th>Date &amp; Time Receive</th>
+        <th>Date &amp; Time Returned</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in transactions %}
+      <tr>
+        <td class="txid">{{ t.transaction_id }}</td>
+        <td class="user">{{ t.user_name }}</td>
+        <td class="item">{{ t.item_name }}</td>
+        <td class="qty">{{ t.quantity }}</td>
+        <td class="contact">{{ t.contact }}</td>
+        <td class="date">{{ t.date|date:"Y-m-d"|default:"—" }}</td>
+        <td class="receive">{{ t.date_receive|date:"Y-m-d H:i"|default:"—" }}</td>
+        <td class="returned">{{ t.date_returned|date:"Y-m-d H:i"|default:"—" }}</td>
+        <td class="status">
+          <span class="badge badge-{{ t.status|lower }}">{{ t.status|capfirst }}</span>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="9" style="text-align:center;color:#6b7280;">No transactions found.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
+
+
 
 <style>
 .history-logs { font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 20px; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; align-items: center; }
 .filters input, .filters select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; background: #fff; }
-.table-wrapper { overflow-x: auto; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; }
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  max-height: 70vh;
+}
 .history-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.history-table th { text-align: left; padding: 10px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #111827; }
-.history-table td { padding: 10px; border-bottom: 1px solid #e5e7eb; color: #111827; }
+.history-table th, .history-table td {
+  padding: 10px;
+  white-space: nowrap;
+}
 .history-table tr:hover { background: #f3f4f6; }
 
 .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; display: inline-block; }

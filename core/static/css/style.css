@@ -1,4 +1,8 @@
-/* Reset */
+/* ================================
+   🧭 DASHBOARD LAYOUT (CLEAN VERSION)
+   ================================ */
+
+/* --- Reset --- */
 * {
   margin: 0;
   padding: 0;
@@ -7,19 +11,22 @@
 
 html, body {
   height: 100%;
-  overflow: auto; /* allow main content scrolling */
+  scrollbar-gutter: stable both-edges;
+  overflow: hidden;
 }
-
 
 body {
   font-family: "Poppins", Arial, sans-serif;
   color: #191a19;
+  background: #f4f6f9;
   display: flex;
   flex-direction: column;
-  background: #f4f6f9;
+  margin: 0;
 }
 
-/* Header */
+/* ===============================
+   HEADER
+   =============================== */
 .header {
   background: #fff;
   border-bottom: 1px solid #ddd;
@@ -28,8 +35,8 @@ body {
   justify-content: space-between;
   padding: 12px 20px;
   height: 60px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-  position: fixed;    /* fix header */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -59,26 +66,37 @@ body {
   font-weight: 500;
 }
 
-.header-right i {
-  margin-left: 18px;
-  font-size: 1.3rem;
+/* 🔔 Notification Bell */
+.notif-bell {
+  position: relative;
   cursor: pointer;
+  font-size: 1.4rem;
   color: #555;
-  transition: color 0.3s;
+  transition: color 0.2s ease;
 }
 
-.header-right i:hover {
+.notif-bell:hover {
   color: #97c6d2;
 }
 
-/* Layout */
-.container {
-  display: flex;
-  flex: 1;
-  height: 100%;
+.notif-badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  background: #e74c3c;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 5px;
+  min-width: 18px;
+  text-align: center;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
 }
 
-/* Sidebar */
+/* ===============================
+   SIDEBAR
+   =============================== */
 .sidebar {
   width: 240px;
   background: #fff;
@@ -86,12 +104,12 @@ body {
   padding: 20px 12px;
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.03);
-  position: fixed;     /* fix sidebar */
-  top: 60px;           /* below header */
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.03);
+  position: fixed;
+  top: 60px;
   bottom: 0;
   left: 0;
-  overflow-y: auto;    /* sidebar scrolls if long */
+  overflow-y: auto;
   z-index: 999;
 }
 
@@ -107,25 +125,25 @@ body {
 .sidebar a {
   display: flex;
   align-items: center;
+  gap: 12px;
   padding: 10px 14px;
   margin-bottom: 8px;
   text-decoration: none;
   color: #444;
   border-radius: 8px;
-  transition: all 0.3s ease;
   font-size: 0.92rem;
   font-weight: 500;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .sidebar a i {
-  margin-right: 12px;
   font-size: 1.1rem;
   color: #777;
-  transition: color 0.3s;
+  transition: color 0.18s ease;
 }
 
 .sidebar a:hover {
-  background: #f0f3ff;
+  background: #eef5fb;
   color: #111;
 }
 
@@ -137,76 +155,136 @@ body {
   background: #97c6d2;
   color: #fff;
   font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 .sidebar a.active i {
   color: #fff;
 }
 
-/* Content */
+/* ===============================
+   CONTENT AREA
+   =============================== */
 .content {
   flex: 1;
-  margin-left: 240px;   /* beside sidebar */
-  margin-top: 60px;     /* below header */
+  margin-left: 225px;
+  margin-top: 60px;
+  margin-right: 300px;
   background: #f9fafc;
-  padding: 0;           /* remove padding so iframe fits edge-to-edge */
-  overflow: hidden;     /* stop extra scrolls */
+  padding: 20px;
+  overflow: auto;
   height: calc(100vh - 60px);
   position: relative;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  will-change: opacity, transform;
 }
 
-.content iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
+body.ready .content {
+  opacity: 1;
+  transform: none;
 }
 
-.content h2 {
-  margin-bottom: 15px;
-  font-size: 1.4rem;
+.content.fullwidth {
+  margin-right: 0 !important;
+}
+
+body.leaving .content {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+/* ===============================
+   RIGHT PENDING PANEL
+   =============================== */
+.pending-container {
+  position: fixed;
+  top: 60px;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  background: #fff;
+  border-left: 1px solid #e0e0e0;
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.03);
+  z-index: 998;
+  overflow-y: auto;
+}
+
+.side-panel {
+  padding: 16px;
+}
+
+.side-panel h3 {
+  font-size: 1.05rem;
   font-weight: 600;
   color: #222;
+  margin-bottom: 12px;
 }
 
-.content p {
-  color: #555;
-  line-height: 1.6;
+.side-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-
-/* Pending Requests Panel */ 
-.pending-container {
-  width: 300px; /* or any width you prefer */
-  position: fixed; /* if you want it to stay on screen */
-  left: 0; /* align left */
-  top: 100px; /* adjust if you have a header */
-  background-color: #f9f9f9;
-  border: 2px solid #ccc; /* added border */
-  border-radius: 8px; /* optional: rounded corners */
-  border-right: 1px solid #ddd;
-  padding: 15px;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-  z-index: 1000;
+.side-panel li {
+  padding: 10px 12px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #fafafa;
 }
- 
-  #pendingPanel h3 { 
-    font-size: 1rem; 
-    font-weight: 600; 
-    margin-bottom: 15px; 
-    color: #222;
-} 
-    
-  #pendingPanel ul { 
-    list-style: none; 
-    padding: 0; 
-} 
-  #pendingPanel li { 
-    padding: 10px 12px; 
-    border-bottom: 1px solid #f0f0f0; 
-    font-size: 0.9rem; 
-    color: #444; 
-} #pendingPanel li:last-child { 
-    border-bottom: none; 
-  
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-high {
+  background: #ffe5e5;
+  color: #b30000;
+}
+
+.badge-medium {
+  background: #fff4cc;
+  color: #996600;
+}
+
+.badge-low {
+  background: #e6f6ff;
+  color: #005b99;
+}
+
+/* ===============================
+   RESPONSIVE
+   =============================== */
+@media (max-width: 1024px) {
+  .content {
+    margin-right: 0;
   }
+
+  .pending-container {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    transition: none;
+    transform: none;
+    opacity: 1 !important;
+  }
+
+  body.leaving .content {
+    opacity: 1;
+    transform: none;
+  }
+
+  .sidebar a {
+    transition: none;
+  }
+}

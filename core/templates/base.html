@@ -8,118 +8,25 @@
 
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
 
-  <style>
-    /* ========== Base + Layout ========== */
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    /* Keep scrollbar space stable to prevent layout jumps on route changes */
-    html { scrollbar-gutter: stable both-edges; }
-
-    body {
-      margin: 0;
-      font-family: "Poppins", Arial, sans-serif;
-      color: #191a19;
-      background: #f4f6f9;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* Header */
-    .header {
-      background:#fff; border-bottom:1px solid #ddd;
-      display:flex; align-items:center; justify-content:space-between;
-      padding:12px 20px; height:60px;
-      box-shadow:0 2px 4px rgba(0,0,0,0.05);
-      position:fixed; top:0; left:0; right:0; z-index:1000;
-    }
-    .logo { display:flex; align-items:center; font-weight:600; font-size:1rem; color:#444; }
-    .logo img.avatar { width:50px; height:36px; object-fit:contain; margin-right:10px; }
-    .header-title { flex:1; text-align:center; font-size:1rem; color:#444; font-weight:500; }
-
-    .container { display:flex; flex:1; height:100%; }
-
-    /* Sidebar */
-    .sidebar {
-      width:240px; background:#fff; border-right:1px solid #e0e0e0;
-      padding:20px 12px; display:flex; flex-direction:column;
-      box-shadow:2px 0 5px rgba(0,0,0,0.03);
-      position:fixed; top:60px; bottom:0; left:0; overflow-y:auto; z-index:999;
-    }
-    .sidebar .menu-label {
-      font-size:0.75rem; color:#999; margin-bottom:14px; padding-left:12px;
-      text-transform:uppercase; letter-spacing:0.5px;
-    }
-    .sidebar a {
-      display:flex; align-items:center; gap:12px;
-      padding:10px 14px; margin-bottom:8px; text-decoration:none;
-      color:#444; border-radius:8px; font-size:.92rem; font-weight:500;
-      /* Keep transitions light to avoid jank */
-      transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
-    }
-    .sidebar a i { font-size:1.1rem; color:#777; transition: color .18s ease; }
-    .sidebar a:hover { background:#eef5fb; color:#111; }
-    .sidebar a:hover i { color:#97c6d2; }
-    .sidebar a.active {
-      background:#97c6d2; color:#fff; font-weight:600;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
-    }
-    .sidebar a.active i { color:#fff; }
-
-    /* Main content area */
-    .content {
-      flex:1; margin-left:240px; margin-top:60px; margin-right:320px; /* reserve space for right panel */
-      background:#f9fafc; padding:20px; overflow:auto; height:calc(100vh - 60px); position:relative;
-
-      /* Page fade (in/out) */
-      opacity: 0;
-      transform: translateY(4px);
-      transition: opacity .22s ease, transform .22s ease;
-      will-change: opacity, transform;
-    }
-    body.ready .content { opacity: 1; transform: none; }
-    body.leaving .content { opacity: 0; transform: translateY(4px); }
-
-    /* Right pending panel */
-    .pending-container {
-      position:fixed; top:60px; right:0; bottom:0; width:320px; background:#fff;
-      border-left:1px solid #e0e0e0; box-shadow:-2px 0 5px rgba(0,0,0,0.03);
-      z-index:998; overflow-y:auto;
-    }
-    .side-panel { padding:16px; }
-    .side-panel h3 { font-size:1.05rem; font-weight:600; color:#222; margin-bottom:12px; }
-
-    /* Pending list baseline so injected styles have a sane default */
-    .side-panel ul { list-style:none; margin:0; padding:0; }
-    .side-panel li { padding:10px 12px; border:1px solid #eee; border-radius:8px; margin-bottom:8px; background:#fafafa; }
-
-    /* Priority badges (used in injected list) */
-    .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:.75rem; font-weight:600; }
-    .badge-high   { background:#ffe5e5; color:#b30000; }
-    .badge-medium { background:#fff4cc; color:#996600; }
-    .badge-low    { background:#e6f6ff; color:#005b99; }
-
-    @media (max-width:1024px) {
-      .content { margin-right:0; }
-      .pending-container { display:none; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .content { transition: none; transform: none; opacity: 1 !important; }
-      body.leaving .content { opacity: 1; transform: none; }
-      .sidebar a { transition: none; }
-    }
-  </style>
 </head>
 
 <body>
   <!-- Header -->
   <header class="header">
     <div class="logo">
-      <img src="{% static 'HULAM-ICON.png' %}" alt="HULAM-ICON" class="avatar"/>
-      <span>H U L A M</span>
+      <img src="{% static 'TRAILLEND-ICON.png' %}" alt="TRAILLEND-ICON" class="avatar"/>
+      <span>TrailLend</span>
     </div>
     <div class="header-title">Barangay Kauswagan - General Service Office</div>
+
+    
+    <div class="notif-bell" onclick="togglePendingPanel()">
+      <i class="fa-solid fa-bell"></i>
+      <span id="notifCount" class="notif-badge" style="display:none;">0</span>
+    </div>
+
   </header>
 
   <div class="container">
@@ -165,26 +72,27 @@
     </aside>
 
     <!-- Main content -->
-    <main class="content">
+    <main class="content {% if request.resolver_match.url_name != 'dashboard' %}fullwidth{% endif %}">
       {% block content %}{% endblock %}
     </main>
 
-    <!-- Right-side Pending Requests Panel -->
-    <div class="pending-container">
-      <aside id="pendingPanel" class="side-panel">
-        <h3>Pending Requests</h3>
-        <ul id="pendingList">
-          <li class="pending-item">Loading…</li>
-        </ul>
-      </aside>
-    </div>
-  </div>
+    <!-- Right Pending Panel -->
+    {% if request.resolver_match.url_name == 'dashboard' %}
+      <!-- Right Pending Panel (Dashboard only) -->
+      <div class="pending-container">
+        <aside id="pendingPanel" class="side-panel">
+          <h3>Pending Requests</h3>
+          <ul id="pendingList">
+            <li class="pending-item">Loading…</li>
+          </ul>
+        </aside>
+      </div>
+    {% endif %}
 
-  <!-- Modal (shared) -->
-  <div id="reservationModal"
-       style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
-              background:rgba(0,0,0,0.5); justify-content:center; align-items:center;">
-    <div style="background:#fff; padding:20px; border-radius:8px; width:400px; position:relative;">
+  <!-- ======= MODALS ======= -->
+  <div id="reservationModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+        justify-content:center; align-items:center; z-index:2000;">
+    <div style="background:#fff; padding:20px; border-radius:10px; width:420px; max-height:90vh; overflow-y:auto;">
       <h3 id="modalTitle"></h3>
       <p><strong>Priority:</strong> <span id="modalPriority"></span></p>
       <p><strong>Borrower:</strong> <span id="modalBorrower"></span></p>
@@ -193,42 +101,45 @@
       <p><strong>Message:</strong> <span id="modalMessage"></span></p>
       <p><strong>Contact:</strong> <span id="modalContact"></span></p>
       <p><strong>Status:</strong> <span id="modalStatus"></span></p>
+
       <div style="display:flex;gap:10px;margin:10px 0;">
-        <img id="modalLetter" src="" alt="Letter" style="width:100px; height:100px; object-fit:cover;">
-        <img id="modalID" src="" alt="ID" style="width:100px; height:100px; object-fit:cover;">
+        <img id="modalLetter" src="" alt="Letter"
+             style="width:100px;height:100px;object-fit:cover;border-radius:6px;cursor:pointer;">
+        <img id="modalID" src="" alt="ID"
+             style="width:100px;height:100px;object-fit:cover;border-radius:6px;cursor:pointer;">
       </div>
+
       <div style="margin-top:15px; display:flex; justify-content:space-between;">
-        <button id="approveBtn" style="background:green;color:#fff;padding:10px;border:none;border-radius:5px;">Approve</button>
-        <button id="declineBtn" style="background:red;color:#fff;padding:10px;border:none;border-radius:5px;">Decline</button>
-        <button id="closeModal" style="background:#ccc;color:#000;padding:10px;border:none;border-radius:5px;">Close</button>
+        <button id="approveBtn" style="background:#2ecc71;color:#fff;padding:10px 16px;border:none;border-radius:6px;">Approve</button>
+        <button id="declineBtn" style="background:#e74c3c;color:#fff;padding:10px 16px;border:none;border-radius:6px;">Decline</button>
+        <button id="closeModal" style="background:#ccc;color:#000;padding:10px 16px;border:none;border-radius:6px;">Close</button>
       </div>
     </div>
   </div>
 
-  <!-- JS: page fade + smooth sidebar navigation -->
+  <!-- Decline Reason Modal -->
+  <div id="declineModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+        justify-content:center; align-items:center; z-index:3000;">
+    <div style="background:#fff; padding:20px; border-radius:10px; width:400px;">
+      <h3>Reason for Decline</h3>
+      <textarea id="declineReason" style="width:100%;height:100px;padding:10px;border-radius:6px;border:1px solid #ccc;resize:none;"></textarea>
+      <div style="margin-top:15px;display:flex;justify-content:flex-end;gap:10px;">
+        <button id="cancelDecline" style="background:#ccc;padding:8px 12px;border:none;border-radius:6px;">Cancel</button>
+        <button id="submitDecline" style="background:#e74c3c;color:#fff;padding:8px 12px;border:none;border-radius:6px;">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Viewer -->
+  <div id="imageViewer" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9);
+        justify-content:center; align-items:center; z-index:4000;">
+    <img id="viewerImg" src="" alt="Preview" style="max-width:90%;max-height:90%;border-radius:10px;">
+    <button id="closeViewer" style="position:absolute;top:20px;right:30px;background:none;border:none;color:#fff;font-size:2rem;cursor:pointer;">&times;</button>
+  </div>
+
+  <!-- ======= JS SECTION ======= -->
   <script>
-    // Fade in when page is ready
-    window.addEventListener('DOMContentLoaded', () => {
-      document.body.classList.add('ready');
-    });
-
-    // Smooth fade-out on sidebar navigation (no manual .active toggling)
-    document.querySelectorAll('.sidebar a').forEach(a => {
-      a.addEventListener('click', (e) => {
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-        const href = a.getAttribute('href');
-        if (!href || a.target === '_blank' || a.origin !== location.origin) return;
-
-        e.preventDefault();
-        document.body.classList.add('leaving');
-        setTimeout(() => { window.location.href = href; }, 120);
-      });
-    });
-  </script>
-
-  <!-- JS: pending panel -->
-  <script>
-    /* === CSRF helper === */
+    // ✅ FIXED: Add missing getCookie()
     function getCookie(name) {
       let cookieValue = null;
       if (document.cookie && document.cookie !== '') {
@@ -236,112 +147,210 @@
         for (let cookie of cookies) {
           cookie = cookie.trim();
           if (cookie.startsWith(name + '=')) {
-            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
             break;
           }
         }
       }
       return cookieValue;
     }
+
     const csrftoken = getCookie('csrftoken');
 
-    /* === Fetch pending requests and render === */
     async function fetchPendingRequests() {
       try {
         const response = await fetch("{% url 'pending_requests_api' %}");
-        if (!response.ok) throw new Error('Bad response');
         const data = await response.json();
         const list = document.getElementById('pendingList');
-        if (!list) return;
-
-        // Cross-fade the injected list for a smoother auto-refresh feel
-        list.style.opacity = '0';
-        setTimeout(() => {
-          list.innerHTML = data.html || '<li class="pending-item">No pending requests</li>';
-          attachClickEvents();
-          list.style.opacity = '1';
-        }, 80);
-      } catch (err) {
-        console.error('Error fetching pending requests:', err);
-      }
-    }
-
-    /* === Attach click events to each pending item === */
-    function attachClickEvents() {
-      document.querySelectorAll('#pendingList .pending-item').forEach(item => {
-        const id = item.dataset.id;
-        if (!id) return; // skip "No pending requests"
-        item.style.cursor = 'pointer';
-        item.onclick = async () => {
-          try {
-            const res = await fetch(`/api/reservation_detail/${id}/`);
-            if (!res.ok) throw new Error('Failed detail');
-            const data = await res.json();
-
-            // Populate modal
-            document.getElementById('modalTitle').innerText = data.item?.name ?? '';
-            document.getElementById('modalPriority').innerText = data.priority_display ?? data.priority ?? '';
-            document.getElementById('modalBorrower').innerText = data.userborrower?.full_name ?? '';
-            document.getElementById('modalQty').innerText = data.quantity ?? '';
-            document.getElementById('modalDate').innerText = data.date ?? '';
-            document.getElementById('modalMessage').innerText = data.message ?? '';
-            document.getElementById('modalContact').innerText = data.contact ?? '';
-            document.getElementById('modalStatus').innerText = data.status ?? '';
-            document.getElementById('modalLetter').src = data.letter_image ?? '';
-            document.getElementById('modalID').src = data.valid_id_image ?? '';
-
-            document.getElementById('reservationModal').style.display = 'flex';
-
-            // Rebind action buttons
-            const approveBtnOld = document.getElementById('approveBtn');
-            const approveBtnNew = approveBtnOld.cloneNode(true);
-            approveBtnOld.replaceWith(approveBtnNew);
-            approveBtnNew.onclick = () => updateReservation(id, 'approved');
-
-            const declineBtnOld = document.getElementById('declineBtn');
-            const declineBtnNew = declineBtnOld.cloneNode(true);
-            declineBtnOld.replaceWith(declineBtnNew);
-            declineBtnNew.onclick = () => updateReservation(id, 'declined');
-
-          } catch (err) {
-            console.error('Error fetching reservation details:', err);
-          }
-        };
-      });
-    }
-
-    /* === Close modal === */
-    document.getElementById('closeModal').onclick = () => {
-      document.getElementById('reservationModal').style.display = 'none';
-    };
-
-    /* === Update reservation status === */
-    async function updateReservation(id, status) {
-      try {
-        const res = await fetch(`/api/reservation_update/${id}/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
-          },
-          body: JSON.stringify({ status })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-          alert(`Reservation ${status}`);
-          document.getElementById('reservationModal').style.display = 'none';
-          fetchPendingRequests();
-        } else {
-          alert('Failed to update reservation');
-        }
+        list.innerHTML = data.html || '<li class="pending-item">No pending requests</li>';
+        attachClickEvents();
       } catch (err) {
         console.error(err);
       }
     }
 
-    /* === Initial fetch + auto refresh === */
+    function attachClickEvents() {
+      document.querySelectorAll('#pendingList .pending-item').forEach(item => {
+        const id = item.dataset.id;
+        item.onclick = async () => {
+          const res = await fetch(`/api/reservation_detail/${id}/`);
+          const data = await res.json();
+          document.getElementById('modalTitle').innerText = data.item?.name ?? '';
+          document.getElementById('modalPriority').innerText = data.priority_display ?? '';
+          document.getElementById('modalBorrower').innerText = data.userborrower?.full_name ?? '';
+          document.getElementById('modalQty').innerText = data.quantity ?? '';
+          document.getElementById('modalDate').innerText = data.date_borrowed ?? '';
+          document.getElementById('modalMessage').innerText = data.message ?? '';
+          document.getElementById('modalContact').innerText = data.contact_number ?? '';
+          document.getElementById('modalStatus').innerText = data.status ?? '';
+          document.getElementById('modalLetter').src = data.letter_image ?? '';
+          document.getElementById('modalID').src = data.valid_id_image ?? '';
+          document.getElementById('reservationModal').style.display = 'flex';
+
+          document.getElementById('approveBtn').onclick = () => updateReservation(id, 'approved');
+
+          document.getElementById('declineBtn').onclick = () => {
+            document.getElementById('declineModal').style.display = 'flex';
+            document.getElementById('submitDecline').onclick = () => {
+              const reason = document.getElementById('declineReason').value.trim();
+              if (!reason) return alert('Please enter a reason.');
+              updateReservation(id, 'rejected', reason);
+              document.getElementById('declineModal').style.display = 'none';
+              document.getElementById('declineReason').value = '';
+            };
+          };
+        };
+      });
+    }
+
+    document.getElementById('closeModal').onclick = () => {
+      document.getElementById('reservationModal').style.display = 'none';
+    };
+    document.getElementById('cancelDecline').onclick = () => {
+      document.getElementById('declineModal').style.display = 'none';
+    };
+    document.getElementById('closeViewer').onclick = () => {
+      document.getElementById('imageViewer').style.display = 'none';
+    };
+
+    document.getElementById('modalLetter').onclick = (e) => {
+      document.getElementById('viewerImg').src = e.target.src;
+      document.getElementById('imageViewer').style.display = 'flex';
+    };
+    document.getElementById('modalID').onclick = (e) => {
+      document.getElementById('viewerImg').src = e.target.src;
+      document.getElementById('imageViewer').style.display = 'flex';
+    };
+
+    async function updateReservation(id, status, reason = null) {
+      const payload = { status };
+      if (reason) payload.reason = reason;
+      const res = await fetch(`/api/reservation_update/${id}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        showToast(`Reservation ${status} successfully `, "success");
+        document.getElementById('reservationModal').style.display = 'none';
+        fetchPendingRequests();
+        
+      } else {
+        showToast(data.message || 'Failed to update reservation', "error");
+        
+      }
+    }
+
     fetchPendingRequests();
     setInterval(fetchPendingRequests, 10000);
   </script>
+
+  <script>
+  window.addEventListener("load", function() {
+  const content = document.querySelector(".content");
+  const pendingPanel = document.querySelector(".pending-container");
+
+  if (!content) return;
+
+  // Determine if we're on Dashboard page
+  const isDashboard = window.location.pathname.includes("dashboard");
+
+  // Hide or show panel based on page
+  if (!isDashboard) {
+    if (pendingPanel) pendingPanel.style.display = "none";
+    content.classList.add("fullwidth");
+  } else {
+    content.classList.remove("fullwidth");
+  }
+
+  document.body.classList.add("ready");
+});
+</script>
+
+<!-- Toast Notification Container -->
+<div id="toast-container"
+     style="position:fixed; top:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:10px;">
+</div>
+
+
+<script>
+function showToast(message, type = "success") {
+  const container = document.getElementById("toast-container");
+ 
+
+  // Create toast element
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  toast.style.padding = "12px 18px";
+  toast.style.borderRadius = "8px";
+  toast.style.color = "#fff";
+  toast.style.fontSize = "0.9rem";
+  toast.style.fontWeight = "500";
+  toast.style.boxShadow = "0 3px 8px rgba(0,0,0,0.25)";
+  toast.style.opacity = "0";
+  toast.style.transform = "translateX(100%)";
+  toast.style.transition = "opacity 0.4s ease, transform 0.4s ease";
+  toast.style.willChange = "opacity, transform";
+  
+  // Colors
+  if (type === "success") toast.style.background = "#2ecc71";
+  else if (type === "error") toast.style.background = "#e74c3c";
+  else if (type === "info") toast.style.background = "#3498db";
+  else toast.style.background = "#444";
+
+  container.appendChild(toast);
+
+  // Animate in
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateX(0)";
+  });
+
+  // Auto remove after 3.5s
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateX(100%)";
+    setTimeout(() => toast.remove(), 400);
+  }, 3500);
+}
+
+async function updatePendingCount() {
+  try {
+    const response = await fetch("{% url 'pending_requests_api' %}");
+    const data = await response.json();
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = data.html || "";
+
+    // Count list items (pending requests)
+    const count = tempDiv.querySelectorAll("li.pending-item").length;
+
+    const badge = document.getElementById("notifCount");
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = "inline";
+    } else {
+      badge.style.display = "none";
+    }
+  } catch (e) {
+    console.error("Error fetching pending count:", e);
+  }
+}
+
+// 🔁 Update every 10 seconds
+updatePendingCount();
+setInterval(updatePendingCount, 10000);
+
+// Toggle panel when clicking the bell
+function togglePendingPanel() {
+  const panel = document.querySelector(".pending-container");
+  if (!panel) return;
+  const isVisible = panel.style.display !== "none";
+  panel.style.display = isVisible ? "none" : "block";
+}
+</script>
 </body>
 </html>

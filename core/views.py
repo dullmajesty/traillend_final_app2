@@ -8,7 +8,9 @@ from django.views.decorators.http import require_GET
 from django.http import JsonResponse, Http404
 from collections import defaultdict
 from django.db import transaction
-from django.db.models import Sum
+from datetime import date, timedelta
+from django.db.models import Sum, Q
+
 import datetime as dt
 import json
 from rest_framework.response import Response
@@ -77,13 +79,17 @@ def admin_login(request):
     return render(request, "login.html")
 
 
-@ensure_csrf_cookie
 @login_required
 def dashboard(request):
-    total_users = UserBorrower.objects.count()
-    total_items = Item.objects.count()
-    total_transactions = Reservation.objects.count()
-    total_borrowed = Reservation.objects.filter(status='approved').count()
+    try:
+        total_users = UserBorrower.objects.count()
+        total_items = Item.objects.count()
+        total_transactions = Reservation.objects.count()
+        total_borrowed = Reservation.objects.filter(status='approved').count()
+        print("✅ Dashboard context:", total_users, total_items, total_transactions, total_borrowed)
+    except Exception as e:
+        print("❌ Error in dashboard view:", e)
+        total_users = total_items = total_transactions = total_borrowed = 0
 
     context = {
         'total_users': total_users,
@@ -91,9 +97,7 @@ def dashboard(request):
         'total_transactions': total_transactions,
         'total_borrowed': total_borrowed,
     }
-
-    return render(request, "dashboard.html", context)
-
+    return render(request, 'dashboard.html', context)
 
 #NEW
 def forgot_password(request):
@@ -298,47 +302,47 @@ def inventory_delete(request):
     return render(request, "inventory_confirm_delete.html")
 
 
-def block_date(request):
-    return render(request, "")  # TODO: supply a template name or remove this view
-
 
 def verification(request):
     return render(request, 'verification.html')
 
-
 def transaction_log(request):
     """
-    Show all reservations that have progressed past 'pending'.
-    You can filter by GET params later (status, dates, search).
+    Show all reservations except pending ones (approved, borrowed, returned, rejected, etc.)
     """
     qs = (
         Reservation.objects
-        .exclude(status='pending')  # only show approved/denied/returned (if you add)
-        .select_related('item', 'userborrower_user')  # userborrower accessed via reverse from User if needed
+        .exclude(status='pending')
+        .select_related('item', 'userborrower')
         .order_by('-id')
     )
 
     transactions = []
     for r in qs:
-        # Prefer full_name from profile; fall back to username
-        full_name = ""
-        try:
-            profile = UserBorrower.objects.select_related('user').get(user=r.user)
-            full_name = profile.full_name or ""
-        except UserBorrower.DoesNotExist:
-            pass
+        borrower_name = getattr(r.userborrower, "full_name", "Unknown")
+        item_name = getattr(r.item, "name", "Unknown")
+        quantity = getattr(r, "quantity", 1)
+        contact = getattr(r, "contact", "N/A")
+        
+        # 🔹 Contact logic: prefer reservation contact, else borrower's contact_number
+        contact = getattr(r, "contact", None)
+        if not contact or contact.strip().lower() in ["", "n/a"]:
+            contact = getattr(r.userborrower, "contact_number", "N/A")
 
+        # map your model fields properly
         transactions.append({
-            "transaction_id": getattr(r, "id", ""),  # or r.transaction_id if you have it
-            "user_name": full_name or (r.user.username if r.user else ""),
-            "item_name": r.item.name if r.item else "",
-            "date_receive": getattr(r, "date_receive", None),
-            "date_returned": getattr(r, "date_returned", None),
-            "status": r.status,
+            "transaction_id": r.transaction_id or f"T{r.id:06d}",
+            "user_name": borrower_name,
+            "item_name": item_name,
+            "quantity": quantity,
+            "contact": contact,
+            "date": r.date_borrowed,           # 🟢 replaced 'date' with 'date_borrowed'
+            "date_receive": r.date_receive,     # existing field, fine
+            "date_returned": r.date_returned,   # existing field, fine
+            "status": r.status.capitalize(),
         })
 
-    return render(request, 'transaction_history.html', {"transactions": transactions})
-
+    return render(request, "transaction_history.html", {"transactions": transactions})
 
 def damage_report(request):
     return render(request, 'damage.html')
@@ -477,9 +481,10 @@ def reservation_detail_api(request, pk: int):
         'item': {'name': getattr(r.item, 'name', '')},
         'userborrower': {'full_name': getattr(r.userborrower, 'full_name', '')},
         'quantity': r.quantity,
-        'date': r.date.strftime('%Y-%m-%d') if getattr(r, 'date', None) else '',
+        'date_borrowed': r.date_borrowed.strftime('%Y-%m-%d') if getattr(r, 'date_borrowed', None) else '',
         'message': r.message or '',
-        'contact': r.contact or '',
+        'contact_number': getattr(r.userborrower, 'contact_number', '') or '',
+
         'status': r.status,
         'priority': r.priority,                       # <--- raw
         'priority_display': pretty_priority(r.priority),  # <--- pretty
@@ -488,69 +493,135 @@ def reservation_detail_api(request, pk: int):
     }
     return Response(data)
 
+
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication, JWTAuthentication])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def reservation_update_api(request, pk: int):
-    from django.conf import settings
-    r = get_object_or_404(Reservation, pk=pk)
+    r = get_object_or_404(
+        Reservation.objects.select_related('item', 'userborrower'),
+        pk=pk
+    )
     new_status = (request.data or {}).get('status')
+    reason_text = (request.data or {}).get('reason', '').strip()
 
     allowed = {'approved', 'rejected', 'borrowed', 'returned', 'pending'}
     if new_status not in allowed:
         return Response({'status': 'error', 'message': 'Invalid status'}, status=400)
 
-    # Update dates based on new status
-    if new_status == 'approved' and hasattr(r, 'approved_at'):
+    item = r.item
+    if not item:
+        return Response({'status': 'error', 'message': 'Item not found'}, status=404)
+
+    prev_status = r.status
+    qty = r.quantity or 0
+
+    # ✅ Update timestamps
+    if new_status == 'approved':
         r.approved_at = timezone.now()
-    if new_status == 'borrowed' and hasattr(r, 'date_receive'):
+    elif new_status == 'borrowed':
         r.date_receive = timezone.now()
-    if new_status == 'returned' and hasattr(r, 'date_returned'):
+    elif new_status == 'returned':
         r.date_returned = timezone.now()
 
+    # ✅ Stock management
+    if prev_status in ['pending', 'approved'] and new_status == 'rejected':
+        item.qty += qty
+        item.save(update_fields=['qty'])
+    elif new_status == 'returned':
+        item.qty += qty
+        item.save(update_fields=['qty'])
+    elif prev_status == 'rejected' and new_status == 'pending':
+        if item.qty >= qty:
+            item.qty -= qty
+            item.save(update_fields=['qty'])
+        else:
+            return Response({'status': 'error', 'message': 'Not enough stock'}, status=400)
+        
+    elif prev_status == 'pending' and new_status == 'approved':
+        if item.qty >= qty:
+            item.qty -= qty
+            item.save(update_fields=['qty'])
+        else:
+            return Response({'status': 'error', 'message': 'Not enough stock'}, status=400)
+
+    # ✅ Save the reservation
     r.status = new_status
-    r.save()
+    r.save(update_fields=['status', 'approved_at', 'date_receive', 'date_returned'])
 
-    # 🧩 If approved — generate QR + create notification + send push
-    if new_status == 'approved':
-        # 1️⃣ Generate QR Code
-        qr_data = f"""
-        Transaction ID: {r.transaction_id}
-        Borrower: {r.userborrower.full_name}
-        Item: {r.item.name}
-        Quantity: {r.quantity}
-        Date: {r.date}
-        Contact: {r.contact}
-        """
-        qr_img = qrcode.make(qr_data)
-        buffer = BytesIO()
-        qr_img.save(buffer, format='PNG')
-        qr_file = ContentFile(buffer.getvalue(), f"qr_{r.transaction_id}.png")
+    # =========================
+    # ✅ Notifications + Debugging
+    # =========================
+    try:
+        if new_status == 'approved':
+            print("DEBUG: generating QR")
+            qr_data = f"""
+            Transaction ID: {r.transaction_id}
+            Borrower: {r.userborrower.full_name}
+            Item: {r.item.name}
+            Quantity: {r.quantity}
+            Date: {getattr(r, 'date_borrowed', '')}
+            Contact: {getattr(r, 'contact_number', 'N/A')}
+            """
+            qr_img = qrcode.make(qr_data)
+            buffer = BytesIO()
+            qr_img.save(buffer, format='PNG')
+            qr_file = ContentFile(buffer.getvalue(), f"qr_{r.transaction_id}.png")
 
-        # 2️⃣ Create Notification entry
-        notif = Notification.objects.create(
-            user=r.userborrower,
-            title="Reservation Approved",
-            message=f"Your reservation for {r.item.name} has been approved! Show this QR code to the admin upon claiming.",
-            type="approval"
-        )
-        notif.qr_code.save(f"qr_{r.transaction_id}.png", qr_file)
-        notif.save()
+            notif = Notification.objects.create(
+                user=r.userborrower,
+                title="Reservation Approved ✅",
+                message=f"Your reservation for {r.item.name} has been approved!",
+                type="approval"
+            )
+            notif.qr_code.save(f"qr_{r.transaction_id}.png", qr_file)
+            notif.save()
 
-        # 3️⃣ Send Push Notification (if token exists)
-        try:
-            token_entry = DeviceToken.objects.filter(user=r.userborrower).last()
-            if token_entry:
-                message = messaging.Message(
-                    notification=messaging.Notification(
-                        title="Request Approved ✅",
-                        body=f"Your QR code for {r.item.name} is ready!"
-                    ),
-                    token=token_entry.token,
-                )
-                messaging.send(message)
-        except Exception as e:
-            print("Error sending push notification:", e)
+            # Optional push notification
+            try:
+                token_entry = DeviceToken.objects.filter(user=r.userborrower).last()
+                if token_entry:
+                    message = messaging.Message(
+                        notification=messaging.Notification(
+                            title="Reservation Approved ✅",
+                            body=f"Your QR code for {r.item.name} is ready!"
+                        ),
+                        token=token_entry.token,
+                    )
+                    messaging.send(message)
+            except Exception as e:
+                print("Push notification error:", e)
+
+        elif new_status == 'rejected':
+            Notification.objects.create(
+                user=r.userborrower,
+                title="Reservation Declined ❌",
+                message=f"Your reservation for {r.item.name} was declined.",
+                reason=reason_text or None,
+                type="rejection"
+            )
+
+            try:
+                token_entry = DeviceToken.objects.filter(user=r.userborrower).last()
+                if token_entry:
+                    body_text = f"Reason: {reason_text or 'No reason provided.'}"
+                    message = messaging.Message(
+                        notification=messaging.Notification(
+                            title="Reservation Declined ❌",
+                            body=body_text[:240]
+                        ),
+                        token=token_entry.token,
+                    )
+                    messaging.send(message)
+            except Exception as e:
+                print("Push notification error:", e)
+
+    except Exception as e:
+        import traceback
+        print("ERROR DURING APPROVAL:", e)
+        traceback.print_exc()
+        return Response({'status': 'error', 'message': str(e)}, status=500)
 
     return Response({'status': 'success'})
 
@@ -600,171 +671,157 @@ def api_inventory_detail(request, id):
 
 
 
-def total_reserved_qty_for_date(item, day):
+
+
+def total_reserved_qty_for_range(item, start_date, end_date):
     """
-    Sum quantity for a specific date for this item, counting only
-    statuses that hold stock (pending + approved).
+    Calculate total quantity reserved for any overlapping date range.
+    Includes reservations that overlap the target range and are pending/approved.
     """
-    agg = (Reservation.objects
-           .filter(item=item, date=day, status__in=['pending', 'approved'])
-           .aggregate(total=Sum('quantity')))
+    overlap_filter = Q(date_borrowed__lte=end_date, date_return__gte=start_date)
+    agg = (
+        Reservation.objects
+        .filter(item=item, status__in=['pending', 'approved'])
+        .filter(overlap_filter)
+        .aggregate(total=Sum('quantity'))
+    )
     return agg['total'] or 0
 
+
 def find_next_available_dates(item, want_qty, start_date, horizon_days=30, limit=3):
+    """Suggest next future ranges where the item can fit."""
     suggestions = []
-    d = max(start_date, dt.date.today())
-    horizon = d + dt.timedelta(days=horizon_days)
-    while d <= horizon and len(suggestions) < limit:
-        reserved = total_reserved_qty_for_date(item, d)
-        if reserved + want_qty <= item.qty:
-            suggestions.append({"date": d.isoformat()})
-        d += dt.timedelta(days=1)
+    current = start_date
+    while len(suggestions) < limit and current < start_date + timedelta(days=horizon_days):
+        reserved = total_reserved_qty_for_range(item, current, current)
+        total_stock = item.qty + (
+            Reservation.objects.filter(item=item, status__in=['pending', 'approved'])
+            .aggregate(total=Sum('quantity')).get('total', 0) or 0
+        )
+        if reserved + want_qty <= total_stock:
+            suggestions.append({"date": current.isoformat()})
+        current += timedelta(days=1)
     return suggestions
 
 
-class BlockedDatesView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, item_id):
-        import datetime as dt
-
-        days_ahead = int(request.query_params.get('days_ahead', 60))
-        if days_ahead < 1 or days_ahead > 365:
-            days_ahead = 60
-
-        try:
-            item = Item.objects.get(pk=item_id)
-        except Item.DoesNotExist:
-            return Response({"detail": "Item not found."}, status=404)
-
-        start = dt.date.today()
-        end = start + dt.timedelta(days=days_ahead)
-
-        blocked = []
-        d = start
-        while d <= end:
-            reserved = total_reserved_qty_for_date(item, d)  # uses date + quantity
-            if reserved >= item.qty:  # item.qty is total stock
-                blocked.append(d.isoformat())
-            d += dt.timedelta(days=1)
-
-        return Response({"blocked": blocked}, status=200)
-
 
 class CheckAvailabilityView(APIView):
+    """
+    Check if the item is available for a given date range and quantity.
+    Returns 409 if not enough available items.
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
-        import datetime as dt
         try:
             item_id = int(request.data.get("item_id"))
             want_qty = int(request.data.get("qty"))
-            date_str = request.data.get("date")
-            reserve_date = dt.date.fromisoformat(date_str)
+            start_date = date.fromisoformat(request.data.get("start_date"))
+            end_date = date.fromisoformat(request.data.get("end_date"))
         except Exception:
             return Response({"detail": "Invalid payload."}, status=400)
 
         if want_qty < 1:
-            return Response({"detail": "qty must be >= 1"}, status=400)
+            return Response({"detail": "Quantity must be >= 1"}, status=400)
+        if start_date > end_date:
+            return Response({"detail": "Invalid date range."}, status=400)
 
         try:
             item = Item.objects.get(pk=item_id)
         except Item.DoesNotExist:
             return Response({"detail": "Item not found."}, status=404)
 
-        reserved = total_reserved_qty_for_date(item, reserve_date)  # date + quantity
-        if reserved + want_qty > item.qty:
-            suggestions = find_next_available_dates(item, want_qty, reserve_date, horizon_days=30, limit=3)
-            return Response(
-                {"detail": "Requested date is not available.",
-                 "blocked": [reserve_date.isoformat()],
-                 "suggestions": suggestions},
-                status=409
-            )
+        # 🔹 Calculate total reserved qty overlapping with requested range
+        reserved = total_reserved_qty_for_range(item, start_date, end_date)
+        available = max(item.qty - reserved, 0)
 
-        return Response({"ok": True}, status=200)
-
-
-
-#UPDATED
-
-class CreateReservationView(APIView):
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]  # accept multipart & JSON
-
-    @transaction.atomic
-    def post(self, request):
-        import datetime as dt
-        data = request.data
-
-        try:
-            item_id = int(data.get("itemID"))
-            qty = int(data.get("quantity"))
-            reserve_date = dt.date.fromisoformat(data.get("date"))
-            message = data.get("message", "")
-            priority = data.get("priority", "Low")
-        except Exception:
-            return Response({"detail": "Invalid payload."}, status=400)
-
-        user = request.user
-        if not user or not user.is_authenticated:
-            return Response({"detail": "Authentication required."}, status=401)
-
-        try:
-            borrower = UserBorrower.objects.get(user=user)
-        except UserBorrower.DoesNotExist:
-            return Response({"detail": "Borrower profile not found for this user."}, status=404)
-
-        try:
-            item = Item.objects.select_for_update().get(pk=item_id)
-        except Item.DoesNotExist:
-            return Response({"detail": "Item not found."}, status=404)
-
-        reserved = total_reserved_qty_for_date(item, reserve_date)
-        if reserved + qty > item.qty:
-            suggestions = find_next_available_dates(item, qty, reserve_date, 30, 3)
+        if available < want_qty:
+            suggestions = find_next_available_dates(item, want_qty, start_date)
             return Response(
                 {
-                    "detail": "Requested date is not available.",
-                    "blocked": [reserve_date.isoformat()],
+                    "detail": "Not enough items available for that range.",
+                    "available_qty": available,
                     "suggestions": suggestions,
                 },
                 status=409,
             )
 
-        # ✅ files & contact
-        letter_file = request.FILES.get("letter_image")
-        id_file = request.FILES.get("valid_id_image")
-        contact = data.get("contact") or borrower.contact_number or "N/A"
+        return Response({"ok": True, "available_qty": available}, status=200)
 
-        # ✅ Create Reservation
-        r = Reservation.objects.create(
+
+class CreateReservationView(APIView):
+    """
+    Create a new reservation only if the requested quantity and dates are available.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    @transaction.atomic
+    def post(self, request):
+        try:
+            item_id = int(request.data.get("itemID"))
+            qty = int(request.data.get("quantity"))
+            start_date = date.fromisoformat(request.data.get("start_date"))
+            end_date = date.fromisoformat(request.data.get("end_date"))
+        except Exception:
+            return Response({"detail": "Invalid payload."}, status=400)
+
+        if start_date > end_date:
+            return Response({"detail": "Invalid date range."}, status=400)
+
+        user = request.user
+        borrower = UserBorrower.objects.get(user=user)
+        item = Item.objects.select_for_update().get(pk=item_id)
+
+        # 🔹 Compute real-time availability
+        reserved = total_reserved_qty_for_range(item, start_date, end_date)
+        available = max(item.qty - reserved, 0)
+
+        if available < qty:
+            suggestions = find_next_available_dates(item, qty, start_date)
+            return Response(
+                {
+                    "detail": "Requested range not available.",
+                    "available_qty": available,
+                    "suggestions": suggestions,
+                },
+                status=409,
+            )
+
+        # 🔹 Create reservation record
+        reservation = Reservation.objects.create(
             item=item,
             userborrower=borrower,
             quantity=qty,
-            date=reserve_date,
-            message=message,
-            priority=priority,
-            letter_image=letter_file,
-            valid_id_image=id_file,
-            contact=contact,
-            status='pending',
+            date_borrowed=start_date,
+            date_return=end_date,
+            message=request.data.get("message", ""),
+            priority=request.data.get("priority", "Low"),
+            letter_image=request.FILES.get("letter_image"),
+            valid_id_image=request.FILES.get("valid_id_image"),
+            contact=request.data.get("contact", borrower.contact_number),
+            status="pending",
         )
-        r.transaction_id = f"T{r.id:06d}"
-        r.save(update_fields=["transaction_id"])
+        reservation.transaction_id = f"T{reservation.id:06d}"
+        reservation.save(update_fields=["transaction_id"])
 
-        # ✅ Create Pending Notification
+        # 🔹 Notify borrower
         create_notification(
             borrower,
             title="Pending Reservation 🕒",
-            message=f"Your reservation for {item.name} is pending admin approval.",
-            notif_type="pending"
+            message=f"Your reservation for {item.name} ({start_date}→{end_date}) is pending approval.",
+            notif_type="pending",
         )
 
         return Response(
-            {"id": r.id, "transaction_id": r.transaction_id, "status": r.status},
+            {
+                "id": reservation.id,
+                "transaction_id": reservation.transaction_id,
+                "status": reservation.status,
+            },
             status=201,
         )
+
 
 
 @csrf_exempt
@@ -955,7 +1012,8 @@ def user_reservations(request):
             'transaction_id': r.transaction_id,
             'item_name': r.item.name if r.item else '',
             'quantity': r.quantity,
-            'date': r.date.strftime('%Y-%m-%d'),
+            'date_borrowed': r.date_borrowed.strftime('%Y-%m-%d') if r.date_borrowed else None,
+            'date_return': r.date_return.strftime('%Y-%m-%d') if r.date_return else None,
             'status': r.status,
             'priority': r.priority,
             'message': r.message or '',
@@ -994,3 +1052,118 @@ def cancel_reservation(request, pk):
         return Response({'success': True, 'message': 'Reservation cancelled successfully.'}, status=200)
     except Reservation.DoesNotExist:
         return Response({'success': False, 'message': 'Reservation not found.'}, status=404)
+
+
+# ✅ NEW — Dynamic availability for a single date
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def item_availability(request, item_id):
+    """
+    Returns availability details for a specific date.
+    Example: /api/items/5/availability/?date=2025-10-27
+    """
+    from datetime import datetime, timedelta, date
+
+    date_str = request.GET.get("date")
+    if not date_str:
+        return Response({"error": "Missing date parameter"}, status=400)
+
+    try:
+        selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return Response({"error": "Invalid date format"}, status=400)
+
+    try:
+        item = Item.objects.get(pk=item_id)
+    except Item.DoesNotExist:
+        return Response({"error": "Item not found"}, status=404)
+
+    # ✅ Find reservations overlapping this date
+    overlapping = Reservation.objects.filter(
+        item=item,
+        status__in=["pending", "approved"],
+        date_borrowed__lte=selected_date,
+        date_return__gte=selected_date,
+    )
+
+    reserved_qty = sum(r.quantity for r in overlapping)
+    total_qty = item.qty or 0
+    available_qty = max(total_qty - reserved_qty, 0)
+
+    # ✅ If no overlapping reservations, mark as available
+    if not overlapping.exists():
+        status = "available"
+    else:
+        status = "fully_reserved" if available_qty <= 0 else "available"
+
+    # ✅ Find the next available date (up to 30 days ahead)
+    suggested_date = None
+    if status == "fully_reserved":
+        next_day = selected_date + timedelta(days=1)
+        for _ in range(30):
+            overlapping_next = Reservation.objects.filter(
+                item=item,
+                status__in=["pending", "approved"],
+                date_borrowed__lte=next_day,
+                date_return__gte=next_day,
+            )
+            if not overlapping_next.exists():
+                suggested_date = next_day.isoformat()
+                break
+            next_day += timedelta(days=1)
+
+    return Response({
+        "item_id": item.item_id,
+        "item_name": item.name,
+        "date": selected_date.isoformat(),
+        "status": status,
+        "total_qty": total_qty,
+        "available_qty": available_qty,
+        "suggested_date": suggested_date,
+    }, status=200)
+
+    
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def item_availability_map(request, item_id):
+    """
+    Returns a 60-day calendar map of reserved/available dates.
+    Marks only dates that overlap with existing reservations as 'fully_reserved'.
+    """
+    from datetime import date, timedelta
+
+    try:
+        item = Item.objects.get(pk=item_id)
+    except Item.DoesNotExist:
+        return Response({"error": "Item not found"}, status=404)
+
+    reservations = list(
+        Reservation.objects.filter(
+            item=item,
+            status__in=["pending", "approved"]
+        ).values("date_borrowed", "date_return", "quantity")
+    )
+
+    start = date.today()
+    end = start + timedelta(days=60)
+
+    days = {}
+    current = start
+    while current <= end:
+        is_reserved = any(
+            res["date_borrowed"] <= current <= res["date_return"]
+            for res in reservations
+        )
+
+        if is_reserved:
+            days[current.isoformat()] = {"status": "fully_reserved"}
+        else:
+            days[current.isoformat()] = {"status": "available"}
+
+        current += timedelta(days=1)
+
+    return Response({
+        "item_id": item.item_id,
+        "item_name": item.name,
+        "calendar": days
+    }, status=200)
