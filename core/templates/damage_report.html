@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="damage-page">
+  <!-- Sidebar (Live Details) -->
+  <section class="report-details-card">
+    <h2 class="section-title">Live Damage Report</h2>
+    <div id="report-details" class="report-details-empty">
+      <p>Click any row to preview full report details.</p>
+    </div>
+  </section>
+
+  <!-- Main Table Section -->
+  <section class="report-table-section">
+    <div class="header-bar">
+      <h2>Damage Reports</h2>
+      <div class="search-wrapper">
+        <input type="text" id="search-input" placeholder="Search by user or address..." />
+        <i class="fa fa-search"></i>
+      </div>
+    </div>
+
+    <p class="total-count">Total Reports: <strong>{{ reports|length }}</strong></p>
+
+    <div class="table-container">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Address</th>
+            <th>Location</th>
+            <th>Quantity</th>
+            <th>Image</th>
+            <th>Date Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if reports %}
+            {% for r in reports %}
+            <tr class="report-row"
+                data-user="{{ r.user_name }}"
+                data-address="{{ r.address }}"
+                data-image="{{ r.image }}"
+                data-date="{{ r.date }}"
+                data-location="{{ r.location }}"
+                data-quantity="{{ r.quantity }}"
+                data-description="{{ r.description }}">
+              <td>{{ r.user_name }}</td>
+              <td>{{ r.address }}</td>
+              <td>{{ r.location }}</td>
+              <td>{{ r.quantity }}</td>
+              <td>
+                {% if r.image != "No image" %}
+                  <img src="{{ r.image }}" alt="Damage Image" class="thumb">
+                {% else %}
+                  <span class="no-img">No image</span>
+                {% endif %}
+              </td>
+              <td>{{ r.date }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="no-data">No Reports Found</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-- ===================== CSS ===================== -->
+<style>
+.damage-page {
+  display: grid;
+  grid-template-columns: 1.3fr 3fr;
+  gap: 24px;
+  padding: 24px;
+  font-family: "Poppins", sans-serif;
+  color: #1f2937;
+  background: #f5f7fa;
+}
+
+/* Sidebar (Details) */
+.report-details-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2563eb;
+  margin-bottom: 16px;
+}
+
+.report-details-empty {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  margin-top: 40px;
+}
+
+.report-details-card img {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.report-details-card p {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+.report-details-card hr {
+  margin: 12px 0;
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Table Section */
+.report-table-section {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+}
+
+.header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.header-bar h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.search-wrapper {
+  position: relative;
+  width: 250px;
+}
+
+.search-wrapper input {
+  width: 100%;
+  padding: 8px 32px 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  outline: none;
+  font-size: 14px;
+  background: #f9fafb;
+}
+
+.search-wrapper i {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  color: #6b7280;
+}
+
+.total-count {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.report-table th {
+  text-align: left;
+  background: #f1f5f9;
+  padding: 12px;
+  color: #334155;
+  font-weight: 600;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.report-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: middle;
+}
+
+.report-table tr:hover {
+  background: #f9fafb;
+  cursor: pointer;
+}
+
+.report-table tr.active {
+  background: #dbeafe !important;
+}
+
+.thumb {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+}
+
+.no-img {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.no-data {
+  text-align: center;
+  color: #9ca3af;
+  font-style: italic;
+  padding: 20px 0;
+}
+</style>
+
+<!-- ===================== JS ===================== -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const rows = document.querySelectorAll(".report-row");
+  const details = document.getElementById("report-details");
+
+  rows.forEach(row => {
+    row.addEventListener("click", function () {
+      rows.forEach(r => r.classList.remove("active"));
+      this.classList.add("active");
+
+      const user = this.dataset.user;
+      const address = this.dataset.address;
+      const image = this.dataset.image;
+      const date = this.dataset.date;
+      const location = this.dataset.location;
+      const quantity = this.dataset.quantity;
+      const description = this.dataset.description;
+
+      const imageHTML =
+        image && image !== "No image"
+          ? `<img src="${image}" alt="Damage Image">`
+          : `<div class='no-img'>No image available</div>`;
+
+      details.classList.remove("report-details-empty");
+      details.innerHTML = `
+        ${imageHTML}
+        <p><strong>User:</strong> ${user}</p>
+        <p><strong>Address:</strong> ${address}</p>
+        <p><strong>Date:</strong> ${date}</p>
+        <hr>
+        <p><strong>Location:</strong> ${location}</p>
+        <p><strong>Quantity Affected:</strong> ${quantity}</p>
+        <p><strong>Description:</strong><br>${description}</p>
+      `;
+    });
+  });
+
+  // Optional: simple search filter
+  const searchInput = document.getElementById("search-input");
+  searchInput.addEventListener("keyup", function () {
+    const value = this.value.toLowerCase();
+    rows.forEach(row => {
+      const user = row.dataset.user.toLowerCase();
+      const address = row.dataset.address.toLowerCase();
+      row.style.display = user.includes(value) || address.includes(value) ? "" : "none";
+    });
+  });
+});
+</script>
+{% endblock %}

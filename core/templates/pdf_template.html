@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #333; padding: 5px; text-align: center; }
+    th { background: #f2f2f2; }
+    h2 { text-align: center; }
+  </style>
+</head>
+<body>
+  <h2>Transactions Report</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Transaction ID</th>
+        <th>Item ID</th>
+        <th>Item Name</th>
+        <th>Borrower</th>
+        <th>Borrowed At</th>
+        <th>Returned At</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in transactions %}
+      <tr>
+        <td>{{ t.transaction_id }}</td>
+        <td>{{ t.item_id }}</td>
+        <td>{{ t.item_name }}</td>
+        <td>{{ t.borrower_name }}</td>
+        <td>{{ t.borrowed_at }}</td>
+        <td>{{ t.returned_at }}</td>
+        <td>{{ t.status }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7">No data available</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

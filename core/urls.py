@@ -61,8 +61,23 @@ urlpatterns = [
     path('api/user_reservations/', views.user_reservations, name='user_reservations'),
     path('api/reservations/<int:pk>/cancel/', views.cancel_reservation, name='cancel_reservation'),
 
+    #verification
+    path("verify_qr/", views.verify_qr, name="verify_qr"),
+    path('verify_qr/<str:mode>/<str:code>/', views.verify_qr, name='verify_qr'),
+    path('update_reservation/<str:mode>/<str:code>/', views.update_reservation, name='update_reservation'),
+
+    path('submit_feedback/', views.submit_feedback, name='submit_feedback'),
+    path('monthly_reset/', views.monthly_reset, name='monthly_reset'),  # optional
+
+    path('damage_report/', views.damage_report_list, name='damage_report_list'),
+    path('api/damage-report/', views.submit_damage_report, name='submit_damage_report'),
+
+    path("statistics/data/", views.statistics_data, name="statistics_data"),
+    path("statistics/export/excel/", views.export_excel, name="export_excel"),
+    path("statistics/export/pdf/", views.export_pdf, name="export_pdf"),
 
 ]
+
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

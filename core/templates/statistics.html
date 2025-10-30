@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="reports-wrap">
@@ -6,23 +7,26 @@
     <h1>Reports</h1>
   </header>
 
+  <!-- Filters -->
   <form id="reportFilters" class="filters" onsubmit="return false;">
     <div class="filter-group">
       <label for="start">Start</label>
-      <input type="date" id="start" name="start">
+      <input type="date" id="start" name="start" value="{{ request.GET.start|default:'' }}">
     </div>
 
     <div class="filter-group">
       <label for="end">End</label>
-      <input type="date" id="end" name="end">
+      <input type="date" id="end" name="end" value="{{ request.GET.end|default:'' }}">
     </div>
 
     <div class="filter-group">
       <label for="items">Items</label>
       <select id="items" name="items">
-        <option value="all">All Items</option>
+        <option value="all" {% if request.GET.items == 'all' or not request.GET.items %}selected{% endif %}>All Items</option>
         {% for item in items %}
-        <option value="{{ item.id }}">{{ item.name }}</option>
+        <option value="{{ item.id }}" {% if request.GET.items == item.id|stringformat:"s" %}selected{% endif %}>
+          {{ item.name }}
+        </option>
         {% endfor %}
       </select>
     </div>
@@ -33,6 +37,7 @@
     </div>
   </form>
 
+  <!-- Top: Chart + Summary -->
   <section class="report-top">
     <div class="card chart-card">
       <canvas id="reportChart" aria-label="Borrowings chart" role="img"></canvas>
@@ -53,6 +58,7 @@
     </aside>
   </section>
 
+  <!-- Transactions -->
   <section class="card transaction-card">
     <div class="transaction-header">
       <h2>Transactions</h2>
@@ -98,24 +104,25 @@
   </section>
 </div>
 
-<!-- Chart.js (CDN) -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- Safely serialize Django lists for JS -->
+{{ chart_labels|json_script:"chart-labels" }}
+{{ chart_counts|json_script:"chart-counts" }}
+
 <script>
-/* ---------- Chart setup (compact) ---------- */
-const canvas = document.getElementById('reportChart');
-canvas.style.display = 'block';
-canvas.style.maxHeight = '160px'; // enforce compact height
+const labels = JSON.parse(document.getElementById('chart-labels').textContent);
+const data = JSON.parse(document.getElementById('chart-counts').textContent);
 
-const ctx = canvas.getContext('2d');
-
-const chartConfig = {
+const ctx = document.getElementById('reportChart').getContext('2d');
+let reportChart = new Chart(ctx, {
   type: 'line',
   data: {
-    labels: ["2025-08-03","2025-08-10","2025-08-12","2025-08-20"],
+    labels: labels,
     datasets: [{
       label: 'Borrowings',
-      data: [4, 7, 9, 10], // sample values (counts) - replace from backend
+      data: data,
       borderWidth: 2,
       borderColor: '#2b7cff',
       pointRadius: 3,
@@ -127,64 +134,76 @@ const chartConfig = {
   options: {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { mode: 'index', intersect: false }
-    },
+    plugins: { legend: { display: false } },
     scales: {
-      x: {
-        grid: { display: false },
-        ticks: { font: { size: 12 } }
-      },
-      y: {
-        beginAtZero: true,
-        ticks: { stepSize: 2, font: { size: 12 } },
-        grid: { color: 'rgba(0,0,0,0.05)' }
-      }
-    },
-    elements: { line: { borderJoinStyle: 'round' } }
+      x: { grid: { display: false } },
+      y: { beginAtZero: true, ticks: { stepSize: 1 } }
+    }
   }
-};
+});
 
-let reportChart = new Chart(ctx, chartConfig);
+// ---------- Update table ----------
+function updateTable(transactions) {
+  const tbody = document.querySelector("#transactionsTable tbody");
+  tbody.innerHTML = "";
+  if (!transactions.length) {
+    tbody.innerHTML = '<tr><td colspan="7">No transactions found.</td></tr>';
+    return;
+  }
+  for (const t of transactions) {
+    const row = `<tr>
+      <td>${t.transaction_id}</td>
+      <td>${t.item_id}</td>
+      <td>${t.item_name}</td>
+      <td>${t.borrower_name}</td>
+      <td>${t.borrowed_at}</td>
+      <td>${t.returned_at}</td>
+      <td>${t.status}</td>
+    </tr>`;
+    tbody.insertAdjacentHTML("beforeend", row);
+  }
+}
 
-/* ---------- Helpers ---------- */
-function clearChart() {
+// ---------- Fetch updated data via AJAX ----------
+document.getElementById("generateBtn").addEventListener("click", async () => {
+  const start = document.getElementById("start").value;
+  const end = document.getElementById("end").value;
+  const items = document.getElementById("items").value;
+
+  const params = new URLSearchParams({ start, end, items });
+  const res = await fetch(`/statistics/data/?${params.toString()}`);
+  const data = await res.json();
+
+  // update chart
+  reportChart.data.labels = data.labels;
+  reportChart.data.datasets[0].data = data.counts;
+  reportChart.update();
+
+  // update summary
+  document.getElementById("totalBorrowings").textContent = data.total_borrowings;
+  document.getElementById("mostItem").textContent = data.most_item;
+  document.getElementById("topBorrower").textContent = data.top_borrower;
+
+  // update table
+  updateTable(data.transactions);
+});
+
+// ---------- Reset filters ----------
+document.getElementById("resetBtn").addEventListener("click", () => {
+  document.getElementById("start").value = "";
+  document.getElementById("end").value = "";
+  document.getElementById("items").value = "all";
   reportChart.data.labels = [];
-  reportChart.data.datasets.forEach(ds => ds.data = []);
+  reportChart.data.datasets[0].data = [];
   reportChart.update();
-}
-
-function populateMockData() {
-  // Example mock update — replace with real AJAX call to your Django view
-  const labels = ['2025-08-03','2025-08-06','2025-08-10','2025-08-15','2025-08-20'];
-  const data = labels.map((_,i) => Math.floor(Math.random()*10)+1);
-  reportChart.data.labels = labels;
-  reportChart.data.datasets[0].data = data;
-  reportChart.update();
-
-  // Update summary mock (replace with actual values)
-  document.getElementById('totalBorrowings').textContent = data.reduce((a,b)=>a+b,0);
-  document.getElementById('mostItem').textContent = 'Sample Item';
-  document.getElementById('topBorrower').textContent = 'Sample Borrower';
-}
-
-/* ---------- Buttons ---------- */
-document.getElementById('generateBtn').addEventListener('click', () => {
-  // You can: fetch('/reports/data?start=...&end=...&item=...') -> update chart with real data
-  populateMockData();
+  document.querySelector("#transactionsTable tbody").innerHTML =
+    '<tr><td colspan="7">No transactions found.</td></tr>';
+  document.getElementById("totalBorrowings").textContent = "0";
+  document.getElementById("mostItem").textContent = "—";
+  document.getElementById("topBorrower").textContent = "—";
 });
 
-document.getElementById('resetBtn').addEventListener('click', () => {
-  // reset UI to initial state
-  reportChart.destroy();
-  reportChart = new Chart(ctx, chartConfig); // recreate with initial sample
-  document.getElementById('totalBorrowings').textContent = '{{ total_borrowings|default:"0" }}';
-  document.getElementById('mostItem').textContent = '{{ most_borrowed_item|default:"—" }}';
-  document.getElementById('topBorrower').textContent = '{{ top_borrower|default:"—" }}';
-});
-
-/* ---------- CSV export (simple) ---------- */
+// ---------- Export CSV ----------
 function tableToCSV(table) {
   const rows = Array.from(table.querySelectorAll('tr'));
   return rows.map(row => {
@@ -192,7 +211,6 @@ function tableToCSV(table) {
     return cells.map(cell => '"' + cell.innerText.replace(/"/g,'""') + '"').join(',');
   }).join('\n');
 }
-
 document.getElementById('exportCsv').addEventListener('click', () => {
   const table = document.getElementById('transactionsTable');
   const csv = tableToCSV(table);
@@ -206,15 +224,27 @@ document.getElementById('exportCsv').addEventListener('click', () => {
   a.remove();
   URL.revokeObjectURL(url);
 });
+// ---------- Export Excel ----------
+document.getElementById('exportExcel').addEventListener('click', () => {
+  const start = document.getElementById("start").value;
+  const end = document.getElementById("end").value;
+  const items = document.getElementById("items").value;
+  const params = new URLSearchParams({ start, end, items });
+  window.location.href = `/statistics/export/excel/?${params.toString()}`;
+});
 
-// exportExcel / exportPdf buttons - implement server-side or using libraries if needed
-document.getElementById('exportExcel').addEventListener('click', () => { alert('Use server export or a library like SheetJS for Excel.'); });
-document.getElementById('exportPdf').addEventListener('click', () => { alert('Use server-side PDF export or jsPDF for client-side PDFs.'); });
-
+// ---------- Export PDF ----------
+document.getElementById('exportPdf').addEventListener('click', () => {
+  const start = document.getElementById("start").value;
+  const end = document.getElementById("end").value;
+  const items = document.getElementById("items").value;
+  const params = new URLSearchParams({ start, end, items });
+  window.location.href = `/statistics/export/pdf/?${params.toString()}`;
+});
 </script>
 
 <style>
-
+/* ✅ Your original styling preserved exactly */
 .reports-wrap{
   max-width: var(--maxwidth);
   margin: 18px auto;
@@ -226,14 +256,12 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   box-sizing: border-box;
 }
 
-/* Header */
 .reports-header h1{
   margin: 0 0 12px 0;
   font-size: 20px;
   letter-spacing: -0.2px;
 }
 
-/* Filters */
 .filters{
   display:flex;
   gap: var(--gap);
@@ -266,7 +294,6 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   box-shadow: inset 0 1px 2px rgba(16,24,40,0.02);
 }
 
-/* Buttons */
 .filter-actions{
   margin-left:auto;
   display:flex;
@@ -284,7 +311,7 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
 
 .btn-primary{
   background:var(--accent);
-  color: red/pink;
+  color:red/pink;
   border-color: rgba(43,124,255,0.9);
   box-shadow: 0 6px 12px rgba(43,124,255,0.08);
 }
@@ -295,7 +322,6 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   border:1px solid #e6e9ef;
 }
 
-/* Top section: chart + summary */
 .report-top{
   display:flex;
   gap: var(--gap);
@@ -303,7 +329,6 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   margin-bottom: 16px;
 }
 
-/* Cards */
 .card{
   background:var(--card);
   border-radius: var(--radius);
@@ -311,7 +336,6 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   box-shadow: var(--shadow);
 }
 
-/* Chart card compact sizing */
 .chart-card{
   flex: 2 1 60%;
   min-width: 220px;
@@ -321,14 +345,12 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   padding: 10px;
 }
 
-/* Force canvas to fit compact card */
 .chart-card canvas{
   width:100% !important;
   height: 160px !important;
   display:block;
 }
 
-/* Summary card sized to match chart */
 .summary-card{
   flex: 1 1 36%;
   min-width: 180px;
@@ -354,7 +376,6 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   font-size:14px;
 }
 
-/* Transaction table */
 .transaction-card{
   margin-top:6px;
   border-radius:6px;
@@ -382,7 +403,7 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   width:100%;
   border-collapse:collapse;
   font-size:13px;
-  min-width:720px; /* keep table readable */
+  min-width:720px;
 }
 
 .transactions th, .transactions td{
@@ -406,11 +427,8 @@ document.getElementById('exportPdf').addEventListener('click', () => { alert('Us
   border-radius:6px;
 }
 
-/* Responsive: stack on small screens */
 @media (max-width:880px){
-  .report-top {
-    flex-direction:column;
-  }
+  .report-top { flex-direction:column; }
   .filter-actions{ margin-left:0; width:100%; justify-content:flex-start; }
   .filters{ gap:10px; }
   .transactions{ min-width:600px; }

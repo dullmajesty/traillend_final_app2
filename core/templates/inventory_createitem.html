@@ -2,190 +2,173 @@
 {% load static %}
 
 {% block content %}
-<div class="card">
-  <h2>Create Item</h2>
+<section class="create-item-page">
+  <div class="form-card">
+    <h2 class="form-title">Add New Inventory Item</h2>
+    <p class="form-subtitle">Fill in the details below to register a new item in the barangay inventory system.</p>
 
-  <form method="POST" enctype="multipart/form-data">
-    {% csrf_token %}
+    <form method="POST" enctype="multipart/form-data" class="item-form">
+      {% csrf_token %}
 
-    <!-- Item Image Preview (Left) + Item Image & Owner (Right) -->
-    <div class="form-row image-owner-row">
-      <div class="left-section">
-        <div class="image-preview">
-          <img id="preview" src="{% static 'placeholder.png' %}" alt="Image Preview">
+      <!-- Image + Owner Section -->
+      <div class="form-section image-owner">
+        <div class="image-preview-container">
+          <div class="image-preview">
+            <img id="preview" src="{% static 'placeholder.png' %}" alt="Image Preview">
+          </div>
+        </div>
+
+        <div class="owner-inputs">
+          <div class="form-group">
+            <label for="itemImage">Upload Item Image</label>
+            <input id="itemImage" name="item_image" type="file" accept="image/*" onchange="previewImage(event)">
+          </div>
+
+          <div class="form-group">
+            <label for="itemOwner">Item Owner</label>
+            <input id="itemOwner" name="item_owner" type="text" value="General Service Office" readonly>
+          </div>
         </div>
       </div>
 
-      <div class="right-section">
+      <!-- Item Details -->
+      <div class="form-row">
         <div class="form-group">
-          <label for="itemImage">Item Image</label>
-          <input id="itemImage" name="item_image" type="file" accept="image/*" onchange="previewImage(event)">
+          <label for="itemName">Item Name</label>
+          <input id="itemName" name="item_name" type="text" placeholder="Enter item name" required>
         </div>
 
         <div class="form-group">
-          <label for="itemOwner">Item Owner</label>
-          <input id="itemOwner" name="item_owner" type="text" value="General Service Office" readonly>
+          <label for="itemStatus">Status</label>
+          <select id="itemStatus" name="item_status" required>
+            <option value="Available" selected>Available</option>
+            <option value="Unavailable">Unavailable</option>
+          </select>
         </div>
       </div>
-    </div>
 
-    <!-- Item Name + Status -->
-    <div class="form-row">
-      <div class="form-group">
-        <label for="itemName">Item Name</label>
-        <input id="itemName" name="item_name" type="text" placeholder="Enter item name" required>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="quantity">Quantity</label>
+          <input id="quantity" name="quantity" type="number" placeholder="Enter quantity" required>
+        </div>
+
+        <div class="form-group">
+          <label for="category">Category</label>
+          <select id="category" name="category" required>
+            <option disabled selected>Select category</option>
+            <option>Chairs</option>
+            <option>Tables</option>
+            <option>Tent</option>
+            <option>Venues</option>
+            <option>Sport Equipment</option>
+            <option>Cooling Ventilation</option>
+            <option>Water Supply</option>
+            <option>Electrical Accessories</option>
+            <option>Audio-Visual Equipment</option>
+            <option>Transportation</option>
+          </select>
+        </div>
       </div>
 
+      <!-- Description -->
       <div class="form-group">
-        <label for="itemStatus">Status</label>
-        <select id="itemStatus" name="item_status" required>
-          <option value="Available" selected>Available</option>
-          <option value="Unavailable">Unavailable</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Quantity + Category -->
-    <div class="form-row">
-      <div class="form-group">
-        <label for="quantity">Quantity</label>
-        <input id="quantity" name="quantity" type="number" placeholder="Enter quantity" required>
+        <label for="description">Description</label>
+        <textarea id="description" name="description" placeholder="Provide additional details about this item..."></textarea>
       </div>
 
-      <div class="form-group">
-        <label for="category">Category</label>
-        <select id="category" name="category">
-          <option disabled selected>Select category</option>
-          <option>Chairs</option>
-          <option>Tables</option>
-          <option>Tent</option>
-          <option>Venues</option>
-          <option>Sport Equipment</option>
-          <option>Cooling Ventilation</option>
-          <option>Water Supply</option>
-          <option>Electrical Accessories</option>
-          <option>Audio-Visual Equipment</option>
-          <option>Transportation</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Description -->
-    <div class="form-group">
-      <label for="description">Description</label>
-      <textarea id="description" name="description" placeholder="Enter description"></textarea>
-    </div>
-
-    <!-- Submit -->
-    <button type="submit" class="btn">Save Item</button>
-  </form>
-</div>
+      <!-- Submit -->
+      <button type="submit" class="btn-primary">
+        <i class="fas fa-save"></i> Save Item
+      </button>
+    </form>
+  </div>
+</section>
 
 <style>
-/* General */
+/* =============================
+   Create Item Page Styling
+   ============================= */
 body {
+  background: #f5f7fb;
   font-family: "Inter", sans-serif;
-  background: #f3f4f6;
-  margin: 0;
+  color: #1f2937;
 }
 
-/* Card container */
-.card {
+/* Layout Container */
+.create-item-page {
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+/* Form Card */
+.form-card {
   background: #ffffff;
-  padding: 30px;
   border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-  max-width: 750px;
-  margin: 20px auto;
-  transition: transform 0.2s ease;
-  margin-bottom: 25px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  padding: 35px 40px;
+  max-width: 800px;
+  width: 100%;
+  animation: fadeIn 0.4s ease;
 }
 
-.card:hover {
-  transform: translateY(-2px);
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Title */
-h2 {
+/* Title + Subtitle */
+.form-title {
   text-align: center;
-  margin-bottom: 25px;
-  color: #1a1635;
-  font-size: 22px;
+  font-size: 1.6rem;
   font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
 }
 
-/* Form groups */
-.form-group {
-  margin-bottom: 12px;
+.form-subtitle {
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin-bottom: 25px;
+}
+
+/* Form Layout */
+.item-form {
   display: flex;
   flex-direction: column;
+  gap: 18px;
 }
 
-/* Make rows flex */
+/* Rows */
 .form-row {
   display: flex;
-  gap: 12px;
-  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-/* Equal width for grouped inputs */
 .form-row .form-group {
   flex: 1;
-  margin-bottom: 0;
-}
-
-label {
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: #333;
-  font-size: 14px;
-}
-
-/* Inputs */
-input,
-select,
-textarea {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  background: #fff;
-  font-size: 14px;
-  transition: border 0.2s, box-shadow 0.2s;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
-  outline: none;
-}
-
-textarea {
-  resize: none;
-  min-height: 100px;
 }
 
 /* Image + Owner Row */
-.image-owner-row {
+.image-owner {
   display: flex;
+  flex-wrap: wrap;
+  gap: 25px;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 30px;
-  margin-bottom: 20px;
 }
 
-/* Left section (preview) */
-.left-section {
+.image-preview-container {
   flex: 1;
   display: flex;
   justify-content: center;
 }
 
 .image-preview {
-  width: 220px;
-  height: 220px;
+  width: 230px;
+  height: 230px;
   border: 2px dashed #cbd5e1;
   border-radius: 12px;
   display: flex;
@@ -201,40 +184,88 @@ textarea {
   object-fit: cover;
 }
 
-/* Right section (stacked vertically) */
-.right-section {
+.owner-inputs {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 15px;
 }
 
-.right-section .form-group {
-  width: 100%;
+/* Form Elements */
+label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #374151;
+  margin-bottom: 6px;
 }
 
-/* Button */
-.btn {
-  display: block;
+input,
+select,
+textarea {
   width: 100%;
-  background: #4f46e5;
-  color: white;
-  padding: 14px;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.9rem;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  outline: none;
+}
+
+textarea {
+  resize: none;
+  min-height: 110px;
+}
+
+/* Submit Button */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #2563eb;
+  color: #fff;
   border: none;
   border-radius: 10px;
-  font-size: 16px;
+  padding: 14px;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.3s, transform 0.1s;
+  transition: background 0.3s, transform 0.2s;
+  margin-top: 10px;
 }
 
-.btn:hover {
-  background: #3730a3;
-  transform: scale(1.02);
+.btn-primary:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
 }
 
-.btn:active {
+.btn-primary:active {
   transform: scale(0.98);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .form-card {
+    padding: 25px 20px;
+  }
+
+  .image-owner {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .image-preview {
+    width: 180px;
+    height: 180px;
+  }
 }
 </style>
 

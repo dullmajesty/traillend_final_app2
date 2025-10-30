@@ -7,6 +7,8 @@ class UserBorrower(models.Model):
     contact_number = models.CharField(max_length=20)
     address = models.TextField()
     profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True) 
+    late_count = models.IntegerField(default=0)
+    borrower_status = models.CharField(max_length=10, default='Good')
 
     def __str__(self):
         return self.user.username
@@ -32,9 +34,10 @@ class Reservation(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
-        ('borrowed', 'Borrowed'),
+        ('in use', 'In Use'),  
         ('returned', 'Returned'),
         ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled'),  
     ]
 
     transaction_id = models.CharField(max_length=20, default="T000000")
@@ -92,3 +95,41 @@ class DeviceToken(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name} - {self.token[:20]}..."
+    
+
+class Feedback(models.Model):
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE)
+    userborrower = models.ForeignKey(UserBorrower, on_delete=models.CASCADE)
+    comment = models.TextField(blank=True, null=True)
+    return_status = models.CharField(max_length=20, choices=[
+        ('On Time', 'On Time'),
+        ('Late', 'Late Return'),
+        ('Not Returned', 'Not Returned')
+    ])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class DamageReport(models.Model):
+    reported_by = models.ForeignKey(UserBorrower, on_delete=models.CASCADE)
+    location = models.CharField(max_length=255)
+    quantity_affected = models.PositiveIntegerField()
+    description = models.TextField()
+    image = models.ImageField(upload_to='damage_reports/', blank=True, null=True)
+    date_reported = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[('Pending', 'Pending'), ('Reviewed', 'Reviewed'), ('Resolved', 'Resolved')],
+        default='Pending'
+    )
+
+    def str(self):
+        return f"{self.reported_by.full_name} - {self.status}"
+
+class BlockedDate(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='blocked_dates')
+    date = models.DateField()
+    reason = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def str(self):
+        return f"{self.item.name} - {self.date}"
