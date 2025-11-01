@@ -1,321 +1,299 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
 
-{% load static %}
-
-<section class="inventory">
-  <h2>Inventory Management</h2>
-  <p>Track and manage your available items below.</p>
+<section class="inventory-page">
+  <header class="inventory-header">
+    <div>
+      <h2>Inventory Management</h2>
+      <p class="subtitle">Monitor, organize, and update all barangay items in one place.</p>
+    </div>
+    <a href="{% url 'inventory-createitem' %}" class="btn primary">
+      <i class="fas fa-plus"></i> Add New Item
+    </a>
+  </header>
 
   <!-- Top Controls -->
-  <div class="inventory-controls">
-    <div class="left-controls">
-      <form method="get" action="">
-        <input type="text" name="q" value="{{ q }}" placeholder="Search items..." class="search-bar">
+  <form method="get" class="inventory-controls">
+    <div class="control-group">
+      <input type="text" name="q" value="{{ q }}" placeholder=" Search items..." class="input search">
 
-        <select name="category" class="filter">
-          <option value="">All Categories</option>
-          <option value="Seating" {% if category == "Seating" %}selected{% endif %}>Seating</option>
-          <option value="Tables" {% if category == "Tables" %}selected{% endif %}>Tables</option>
-          <option value="Tent" {% if category == "Tent" %}selected{% endif %}>Tent</option>
-          <option value="Venues" {% if category == "Venues" %}selected{% endif %}>Venues</option>
-          <option value="Sport Equipment" {% if category == "Sport Equipment" %}selected{% endif %}>Sport Equipment</option>
-          <option value="Cooling Ventilation" {% if category == "Cooling Ventilation" %}selected{% endif %}>Cooling Ventilation</option>
-          <option value="Water Supply" {% if category == "Water Supply" %}selected{% endif %}>Water Supply</option>
-          <option value="Electrical Accessories" {% if category == "Electrical Accessories" %}selected{% endif %}>Electrical Accessories</option>
-          <option value="Audio-Visual Equipment" {% if category == "Audio-Visual Equipment" %}selected{% endif %}>Audio-Visual Equipment</option>
-          <option value="Transportation" {% if category == "Transportation" %}selected{% endif %}>Transportation</option>
-        </select>
+      <select name="category" class="input select">
+        <option value="">All Categories</option>
+        <option value="Seating" {% if category == "Seating" %}selected{% endif %}>Seating</option>
+        <option value="Tables" {% if category == "Tables" %}selected{% endif %}>Tables</option>
+        <option value="Tent" {% if category == "Tent" %}selected{% endif %}>Tent</option>
+        <option value="Venues" {% if category == "Venues" %}selected{% endif %}>Venues</option>
+        <option value="Sport Equipment" {% if category == "Sport Equipment" %}selected{% endif %}>Sport Equipment</option>
+        <option value="Cooling Ventilation" {% if category == "Cooling Ventilation" %}selected{% endif %}>Cooling Ventilation</option>
+        <option value="Water Supply" {% if category == "Water Supply" %}selected{% endif %}>Water Supply</option>
+        <option value="Electrical Accessories" {% if category == "Electrical Accessories" %}selected{% endif %}>Electrical Accessories</option>
+        <option value="Audio-Visual Equipment" {% if category == "Audio-Visual Equipment" %}selected{% endif %}>Audio-Visual Equipment</option>
+        <option value="Transportation" {% if category == "Transportation" %}selected{% endif %}>Transportation</option>
+      </select>
 
+      <select name="status" class="input select">
+        <option value="">All Status</option>
+        <option value="Available" {% if status == "Available" %}selected{% endif %}>Available</option>
+        <option value="Not Available" {% if status == "Not Available" %}selected{% endif %}>Not Available</option>
+      </select>
 
+      <select name="sort" class="input select">
+        <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
+        <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest</option>
+      </select>
 
-        <select name="status" class="filter">
-          <option value="">All Status</option>
-          <option value="Available" {% if status == "Available" %}selected{% endif %}>Available</option>
-          <option value="Not Available" {% if status == "Not Available" %}selected{% endif %}>Not Available</option>
-        </select>
-
-        <select name="sort" class="sort">
-          <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
-          <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest</option>
-        </select>
-
-        <button type="submit" class="btn small">Apply</button>
-         <a href="{% url 'inventory-createitem' %}" class="btn add">
-            <i class="fas fa-plus"></i> Create New Item
-        </a>
-      </form>
+      <button type="submit" class="btn outline">Apply</button>
     </div>
 
-    <div class="right-controls">
-      <span class="total-items">Total Items: <strong>{{ total_items }}</strong></span>
+    <div class="control-summary">
+      <span>Total Items: <strong>{{ total_items }}</strong></span>
     </div>
-  </div>
-</section>
+  </form>
 
-<section class="inventory-cards">
-  {% if items %}
-    {% for item in items %}
-      <div class="card">
-        <!-- Category badge -->
-        <div class="category 
-            {% if item.category == 'Seating' %}category-seating{% endif %}
-            {% if item.category == 'Tables' %}category-tables{% endif %}
-            {% if item.category == 'Tent' %}category-tent{% endif %}
-            {% if item.category == 'Venues' %}category-venues{% endif %}
-            {% if item.category == 'Sport Equipment' %}category-sport-equipment{% endif %}
-            {% if item.category == 'Cooling Ventilation' %}category-cooling-ventilation{% endif %}
-            {% if item.category == 'Water Supply' %}category-water-supply{% endif %}
-            {% if item.category == 'Electrical Accessories' %}category-electrical-accessories{% endif %}
-            {% if item.category == 'Audio-Visual Equipment' %}category-audio-visual-equipment{% endif %}
-            {% if item.category == 'Transportation' %}category-transportation{% endif %}
-        ">
+  <!-- Inventory Cards -->
+  <section class="inventory-grid">
+    {% if items %}
+      {% for item in items %}
+        <div class="inventory-card">
+          <div class="category-tag 
+              {% if item.category == 'Seating' %}tag-seating{% endif %}
+              {% if item.category == 'Tables' %}tag-tables{% endif %}
+              {% if item.category == 'Tent' %}tag-tent{% endif %}
+              {% if item.category == 'Venues' %}tag-venues{% endif %}
+              {% if item.category == 'Sport Equipment' %}tag-sport{% endif %}
+              {% if item.category == 'Cooling Ventilation' %}tag-cooling{% endif %}
+              {% if item.category == 'Water Supply' %}tag-water{% endif %}
+              {% if item.category == 'Electrical Accessories' %}tag-electrical{% endif %}
+              {% if item.category == 'Audio-Visual Equipment' %}tag-audio{% endif %}
+              {% if item.category == 'Transportation' %}tag-transport{% endif %}
+          ">
             {{ item.category }}
-        </div>
-        
-        {% if item.image %}
-          <img src="{{ item.image.url }}" alt="{{ item.name }}">
-        {% else %}
-          <img src="{% static 'images/item.png' %}" alt="{{ item.name }}">
-        {% endif %}
+          </div>
 
-        <h3>{{ item.name }}</h3>
-        <p><strong>Qty:</strong> {{ item.qty }}</p>
-        <p><strong>Owner:</strong> {{ item.owner }}</p>
-        <p><strong>Status:</strong> {{ item.status }}</p>
+          {% if item.image %}
+            <img src="{{ item.image.url }}" alt="{{ item.name }}">
+          {% else %}
+            <img src="{% static 'images/item.png' %}" alt="{{ item.name }}">
+          {% endif %}
 
-        <div class="card-actions">
-            <a href="{% url 'inventory_edit' item.item_id %}" class="btn edit">
-                <i class="fas fa-edit"></i> Edit
+          <h3>{{ item.name }}</h3>
+          <ul class="item-details">
+            <li><strong>Qty:</strong> {{ item.qty }}</li>
+            <li><strong>Owner:</strong> {{ item.owner }}</li>
+            <li><strong>Status:</strong> <span class="status {{ item.status|lower }}">{{ item.status }}</span></li>
+          </ul>
+
+          <div class="card-actions">
+            <a href="{% url 'inventory_detail' item.item_id %}" class="btn secondary">
+              <i class="fas fa-info-circle"></i> Details
             </a>
-            <a href="{% url 'inventory_detail' item.item_id %}" class="btn details">
-                <i class="fas fa-info-circle"></i> Details
+            <a href="{% url 'inventory_edit' item.item_id %}" class="btn dark">
+              <i class="fas fa-edit"></i> Edit
             </a>
+          </div>
         </div>
-      </div>
-    {% endfor %}
-  {% else %}
-    <p>No items yet.</p>
-  {% endif %}
+      {% endfor %}
+    {% else %}
+      <p class="no-items">No items found in the inventory.</p>
+    {% endif %}
+  </section>
 </section>
-
-
 
 
 <style>
-/* Inventory Page */
 
-/* Card Grid */
-.inventory-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 20px;
-  margin: 40px 20px 20px 20px; /* top, right, bottom, left */
-  padding: 12px;
-}
-
-.card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 15px;
-  text-align: center;
-  border: none;
-  box-shadow:
-    0 4px 8px rgba(0,0,0,0.08),
-    0 6px 20px rgba(0,0,0,0.12);
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-  position: relative;
-}
-
-.card:hover {
-  transform: translateY(-8px);
-  box-shadow:
-    0 8px 16px rgba(0,0,0,0.12),
-    0 12px 30px rgba(0,0,0,0.18);
-}
-
-/* Card Badge */
-.card .category {
-  padding: 6px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 14px;
-}
-
-/* Colors per category – Pastel version */
-.category-seating { background-color: #A0E7E5; }           /* pastel teal */
-.category-tables { background-color: #FFD6A5; }           /* pastel orange */
-.category-tent { background-color: #ffffbaff; color: black; } /* pastel yellow */
-.category-venues { background-color: #CBAACB; }           /* pastel purple */
-.category-sport-equipment { background-color: #B5EAD7; }   /* pastel green */
-.category-cooling-ventilation { background-color: #CAF7E3; color: black; } /* pastel cyan */
-.category-water-supply { background-color: #AEDFF7; }      /* pastel blue */
-.category-electrical-accessories { background-color: #FFB3BA; } /* pastel red/pink */
-.category-audio-visual-equipment { background-color: #E0E0E0; color: black; } /* pastel gray */
-.category-transportation { background-color: #D4F1BE; color: black; } /* pastel light green */
-
-
-/* Image */
-.card img {
-  width: 100px;
-  height: 100px;
-  object-fit: contain;
-  margin: 15px auto;
-  display: block;
-}
-
-/* Title */
-.card h3 {
-  font-size: 1.1rem;
-  margin: 8px 0;
-  color: #333;
-}
-
-/* Quantity */
-.card p {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-/* Actions */
-.card-actions {
+/* Header */
+.inventory-header {
   display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
 }
 
-.card .btn {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  border: none;
-  cursor: pointer;
-  transition: background 0.3s;
+.inventory-header h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #1f2937;
 }
 
-.card .btn.details {
-  background: #eee;
-  color: #333;
+.subtitle {
+  color: #6b7280;
+  font-size: 0.95rem;
 }
 
-.card .btn.edit {
-  background: #222;
-  color: #fff;
-}
-
-.inventory {
-  padding: 20px;
-}
-
+/* Controls */
 .inventory-controls {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 15px 0 20px;
+  flex-wrap: wrap;
+  background: #fff;
+  padding: 15px 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  margin-bottom: 25px;
+}
+
+.control-group {
+  display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.left-controls {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.search-bar {
-  padding: 6px 10px;
+.input {
+  padding: 8px 12px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 0.9rem;
+  background: #fff;
+  min-width: 140px;
 }
 
-.filter, .sort {
-  padding: 6px 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
+.input.search {
+  min-width: 200px;
 }
 
-.right-controls {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.total-items {
-  font-size: 0.95rem;
-  color: #333;
-}
-
-/* Applies to both <button> and <a> */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: none;
   border-radius: 6px;
-  cursor: pointer;
   font-size: 0.9rem;
-  transition: background 0.3s;
-  text-decoration: none; /* <— removes underline for links */
-  color: inherit;        /* <— ensures text uses button color */
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-
-/* Specific button styles */
-.btn.add {
-  background: #4CAF50;
-  color: white;
+.btn.primary {
+  background: #2563eb;
+  color: #fff;
 }
 
-.btn.export {
-  background: #2196F3;
-  color: white;
+.btn.dark {
+  background: #111827;
+  color: #fff;
 }
 
-.btn.small {
-  padding: 6px 10px;
-  font-size: 0.8rem;
+.btn.secondary {
+  background: #e5e7eb;
+  color: #111827;
 }
 
-.btn.danger {
-  background: #f44336;
-  color: white;
+.btn.outline {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #374151;
 }
 
 .btn:hover {
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
+.control-summary {
+  font-size: 0.95rem;
+  color: #374151;
+}
 
-.inventory-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
+/* Grid */
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 22px;
+}
+
+.inventory-card {
   background: #fff;
-  border: 1px solid #ddd;
+  border-radius: 14px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  position: relative; /* Make sure this stays */
+  overflow: hidden;
 }
 
-.inventory-table th,
-.inventory-table td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #eee;
+.inventory-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
-.inventory-table th {
-  background: #f8f9fb;
+/* Category Tag */
+.category-tag {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f3f4f6;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  white-space: nowrap;
+}
+
+
+/* Pastel Category Colors */
+.tag-seating { background: #a7f3d0; }
+.tag-tables { background: #fde68a; }
+.tag-tent { background: #fef3c7; }
+.tag-venues { background: #ddd6fe; }
+.tag-sport { background: #bbf7d0; }
+.tag-cooling { background: #bae6fd; }
+.tag-water { background: #bfdbfe; }
+.tag-electrical { background: #fecaca; }
+.tag-audio { background: #e5e7eb; }
+.tag-transport { background: #d9f99d; }
+
+/* Image */
+.inventory-card img {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin: 35px auto 10px auto;
+  display: block;
+}
+
+/* Text */
+.inventory-card h3 {
+  font-size: 1.05rem;
+  color: #111827;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.item-details {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   font-size: 0.9rem;
-  color: #555;
+  color: #6b7280;
 }
 
-.inventory-table tr:hover {
-  background: #f9f9f9;
+.item-details li {
+  margin-bottom: 4px;
 }
 
+.status.available { color: #10b981; font-weight: 600; }
+.status.not { color: #ef4444; font-weight: 600; }
 
+/* Card Actions */
+.card-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.no-items {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 40px;
+}
 </style>
+
 {% endblock %}

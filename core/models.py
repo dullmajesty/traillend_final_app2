@@ -44,7 +44,7 @@ class Reservation(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='reservations')
     userborrower = models.ForeignKey(UserBorrower, on_delete=models.CASCADE, null=True)
 
-    # 🔹 NEW: date range instead of single date
+    # NEW: date range instead of single date
     date_borrowed = models.DateField()
     date_return = models.DateField()
 
@@ -74,6 +74,7 @@ class Reservation(models.Model):
 
 class Notification(models.Model):
     user = models.ForeignKey(UserBorrower, on_delete=models.CASCADE)
+    reservation = models.ForeignKey('Reservation', on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=100)
     message = models.TextField()
     reason = models.TextField(blank=True, null=True)

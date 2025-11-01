@@ -4,60 +4,113 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reset Password - TrailLend</title>
+  <title>Reset Password | TrailLend</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
   <style>
-    body {
+    * {
       margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: url("{% static 'bkcover.png' %}");
-      background-size: cover;
-      font-family: 'Poppins', sans-serif;
+      padding: 0;
+      box-sizing: border-box;
     }
 
+    body {
+      font-family: "Poppins", sans-serif;
+      background: url("{% static 'bkcover.png' %}") no-repeat center center / cover;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* --- HEADER --- */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.98);
+      color: #1a1a1a;
+      text-align: left;
+      padding: 16px 50px;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      border-bottom: 3px solid #fab417;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+    }
+
+    header span {
+      color: #fab417;
+      font-weight: 700;
+    }
+
+    /* --- RESET PASSWORD CARD --- */
     .reset-container {
-      background: #fff;
-      padding: 35px 30px;
-      border-radius: 10px;
-      width: 400px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 40px 35px;
+      border-radius: 16px;
+      width: 420px;
       max-width: 90%;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
       text-align: center;
-      position: relative;
+      backdrop-filter: blur(10px);
+      margin-top: 100px;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .reset-container:hover {
+      transform: translateY(-3px);
     }
 
     h2 {
-      margin-bottom: 15px;
+      margin-bottom: 20px;
       color: #000;
       font-size: 22px;
       font-weight: 600;
     }
 
+    label {
+      display: block;
+      text-align: left;
+      font-weight: 500;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #333;
+    }
+
     .input-box {
       width: 100%;
       padding: 12px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      margin: 10px 0;
+      border: 1px solid #d0d0d0;
+      border-radius: 10px;
+      margin-bottom: 18px;
       font-size: 15px;
+      transition: 0.2s;
+      background: #f8f8f8;
+    }
+
+    .input-box:focus {
+      border-color: #fab417;
+      box-shadow: 0 0 4px rgba(250, 180, 23, 0.4);
       outline: none;
+      background: #fff;
     }
 
     .btn {
       width: 100%;
       padding: 12px;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       font-weight: 600;
-      background-color: #FAB417;
+      background-color: #fab417;
       color: #fff;
       font-size: 15px;
       cursor: pointer;
       transition: 0.3s;
+      margin-top: 5px;
     }
 
     .btn:hover {
@@ -91,10 +144,36 @@
       100% { opacity: 0; transform: translate(-50%, -20px); }
     }
 
+    .back-link {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .back-link a {
+      text-decoration: none;
+      color: #1f1b4f;
+      font-weight: 500;
+    }
+
+    .back-link a:hover {
+      text-decoration: underline;
+    }
+
+    .footer-text {
+      margin-top: 25px;
+      font-size: 13px;
+      color: #555;
+    }
   </style>
 </head>
 
 <body>
+  <!-- HEADER -->
+  <header>
+    Barangay <span>Kauswagan</span>, Cagayan de Oro City
+  </header>
+
+  <!-- RESET PASSWORD CARD -->
   <div class="reset-container">
     <h2>Reset Password</h2>
 
@@ -108,7 +187,7 @@
             if ("{{ message.tags }}" === "success") {
               setTimeout(() => {
                 window.location.href = "{% url 'login' %}";
-              }, 20000);  // Redirect after 2 seconds
+              }, 2000); // Redirect after 2 seconds
             }
           });
         </script>
@@ -117,18 +196,20 @@
 
     <form method="post">
       {% csrf_token %}
-      <label><strong>New Password</strong></label>
+      <label>New Password</label>
       <input type="password" name="new_password" class="input-box" placeholder="Enter new password" required>
 
-      <label><strong>Confirm Password</strong></label>
+      <label>Confirm Password</label>
       <input type="password" name="confirm_password" class="input-box" placeholder="Confirm new password" required>
 
       <button type="submit" class="btn">Reset Password</button>
     </form>
 
-    <p style="margin-top: 10px; font-size: 14px;">
-      <a href="{% url 'login' %}">Back to Login</a>
+    <p class="back-link">
+      <a href="{% url 'login' %}"><i class="fa-solid fa-arrow-left"></i> Back to Login</a>
     </p>
+
+    <p class="footer-text">© 2025 Barangay Kauswagan | TrailLend System</p>
   </div>
 </body>
 </html>

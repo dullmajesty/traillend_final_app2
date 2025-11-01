@@ -3,114 +3,274 @@
 
 {% block content %}
 <div class="history-logs">
-  <h2>Transaction History</h2>
-  <p>Total Transactions: {{ transactions|length }}</p>
+  <div class="header-section">
+    <h2>Transaction History</h2>
+    <p>Total Transactions: <strong>{{ transactions|length }}</strong></p>
+  </div>
 
   <!-- Filters -->
   <div class="filters">
-    <input type="text" id="searchBox" placeholder="Search transaction, user, or item">
-
+    <input type="text" id="searchBox" placeholder=" Search by transaction, user, or item">
     <select id="statusFilter">
-      <option value="">All statuses</option>
+      <option value="">All Statuses</option>
+      <option value="pending">Pending</option>
       <option value="approved">Approved</option>
-      <option value="borrowed">Borrowed</option>
+      <option value="in use">In Use</option>
       <option value="returned">Returned</option>
-      <option value="declined">Declined</option>
+      <option value="rejected">Rejected</option>
+      <option value="cancelled">Cancelled</option>
     </select>
 
-    <label>From
-      <input type="date" id="fromDate">
-    </label>
 
-    <label>To
-      <input type="date" id="toDate">
-    </label>
+    <div class="date-filter">
+      <label>
+        From
+        <input type="date" id="fromDate">
+      </label>
+      <label>
+        To
+        <input type="date" id="toDate">
+      </label>
+    </div>
 
-    <select id="rowsPerPage">
+    <select id="rowsPerPage" class="rows-select">
       <option value="10">10 rows</option>
       <option value="25">25 rows</option>
       <option value="50">50 rows</option>
     </select>
   </div>
 
- <!-- Table -->
-<div class="table-wrapper">
-  <table class="history-table">
-    <thead>
-      <tr>
-        <th>Transaction ID</th>
-        <th>User Name</th>
-        <th>Item Name</th>
-        <th>Quantity</th>
-        <th>Contact</th>
-        <th>Date Reserved</th>
-        <th>Date &amp; Time Receive</th>
-        <th>Date &amp; Time Returned</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in transactions %}
-      <tr>
-        <td class="txid">{{ t.transaction_id }}</td>
-        <td class="user">{{ t.user_name }}</td>
-        <td class="item">{{ t.item_name }}</td>
-        <td class="qty">{{ t.quantity }}</td>
-        <td class="contact">{{ t.contact }}</td>
-        <td class="date">{{ t.date|date:"Y-m-d"|default:"—" }}</td>
-        <td class="receive">{{ t.date_receive|date:"Y-m-d H:i"|default:"—" }}</td>
-        <td class="returned">{{ t.date_returned|date:"Y-m-d H:i"|default:"—" }}</td>
-        <td class="status">
-          <span class="badge badge-{{ t.status|lower }}">{{ t.status|capfirst }}</span>
-        </td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="9" style="text-align:center;color:#6b7280;">No transactions found.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <!-- Table -->
+  <div class="table-wrapper">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Transaction ID</th>
+          <th>User Name</th>
+          <th>Item Name</th>
+          <th>Quantity</th>
+          <th>Contact</th>
+          <th>Recorded On</th>
+          <th>Date &amp; Time Receive</th>
+          <th>Date &amp; Time Returned</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td class="txid">{{ t.transaction_id }}</td>
+            <td class="user">{{ t.user_name }}</td>
+            <td class="item">{{ t.item_name }}</td>
+            <td class="qty">{{ t.quantity }}</td>
+            <td class="contact">{{ t.contact }}</td>
+            <td>{{ t.created_at|date:"Y-m-d h:i A"|default:"—" }}</td>
+            <td class="receive">{{ t.date_receive|date:"Y-m-d h:i A"|default:"—" }}</td>
+            <td class="returned">{{ t.date_returned|date:"Y-m-d h:i A"|default:"—" }}</td>
+            <td class="status">
+              <span class="badge badge-{{ t.status|lower }}">{{ t.status|capfirst }}</span>
+          </td>
+
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="empty-state">No transactions found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
-
-
 <style>
-.history-logs { font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 20px; }
-.filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; align-items: center; }
-.filters input, .filters select { padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; background: #fff; }
+/* === Base Layout === */
+.history-logs {
+  font-family: "Inter", system-ui, sans-serif;
+  padding: 32px;
+  background-color: #f8fafc;
+  min-height: calc(100vh - 100px);
+}
+
+.header-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.header-section h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.header-section p {
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+/* === Filters === */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+  align-items: center;
+  background: #ffffff;
+  padding: 12px 16px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.filters input,
+.filters select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  color: #334155;
+  transition: border-color 0.2s ease;
+}
+
+.filters input:focus,
+.filters select:focus {
+  border-color: #3b82f6;
+  outline: none;
+}
+
+.date-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.date-filter label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #475569;
+  margin: 0;
+}
+
+.date-filter input[type="date"] {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #334155;
+  background: #fff;
+  height: 36px;
+}
+
+.date-filter input[type="date"]:focus {
+  border-color: #3b82f6;
+  outline: none;
+}
+
+
+/* === Table === */
 .table-wrapper {
   overflow-x: auto;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
+  border-radius: 10px;
   background: #fff;
-  max-height: 70vh;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
 }
-.history-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.history-table th, .history-table td {
-  padding: 10px;
-  white-space: nowrap;
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  color: #334155;
 }
-.history-table tr:hover { background: #f3f4f6; }
 
-.badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; display: inline-block; }
-.badge-approved { background:#e0f2fe; color:#0369a1; }
-.badge-borrowed { background:#fff7ed; color:#9a3412; }
-.badge-returned { background:#ecfdf5; color:#065f46; }
-.badge-declined { background:#fee2e2; color:#991b1b; }
+.history-table th {
+  background: #f1f5f9;
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+}
 
-/* Optional: responsive labels on small screens */
-@media (max-width: 640px) {
-  .filters { gap: 6px; }
-  .history-table th, .history-table td { padding: 8px; }
+.history-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.history-table tr:hover {
+  background: #f8fafc;
+}
+
+.empty-state {
+  text-align: center;
+  color: #94a3b8;
+  padding: 20px 0;
+  font-style: italic;
+}
+
+/* === Badges === */
+.badge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.badge-pending {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+
+.badge-approved {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badge-borrowed {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.badge-returned {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.badge-declined,
+.badge-rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters input,
+  .filters select {
+    width: 100%;
+  }
+
+  .history-table th,
+  .history-table td {
+    padding: 10px;
+    font-size: 13px;
+  }
 }
 </style>
 
 <script>
-/* Tiny client-side filtering + simple "rows per page" limiter */
-(function(){
+(function() {
   const rows = Array.from(document.querySelectorAll('.history-table tbody tr'))
-    .filter(tr => tr.querySelectorAll('td').length >= 6); // ignore "empty" row
+    .filter(tr => tr.querySelectorAll('td').length >= 6);
 
   const searchBox = document.getElementById('searchBox');
   const statusFilter = document.getElementById('statusFilter');
@@ -118,108 +278,59 @@
   const toDate = document.getElementById('toDate');
   const rowsPerPage = document.getElementById('rowsPerPage');
 
-  function toDate(s) {
-    // expects "YYYY-mm-dd HH:MM" or "—"
+  // helper for date
+  function parseDate(s) {
     if (!s || s === '—') return null;
-    // make it ISO-ish for Date parsing
     return new Date(s.replace(' ', 'T'));
   }
 
-  function apply() {
+  function applyFilters() {
     const q = (searchBox.value || '').toLowerCase().trim();
-    const status = (statusFilter.value || '').toLowerCase();
+    const selectedStatus = (statusFilter.value || '').toLowerCase();
     const from = fromDate.value ? new Date(fromDate.value) : null;
     const to = toDate.value ? new Date(toDate.value) : null;
     const limit = parseInt(rowsPerPage.value || '10', 10);
 
     let shown = 0;
+
     rows.forEach(tr => {
       const txId = tr.querySelector('.txid')?.textContent.toLowerCase() || '';
       const user = tr.querySelector('.user')?.textContent.toLowerCase() || '';
       const item = tr.querySelector('.item')?.textContent.toLowerCase() || '';
+      const statusText = tr.querySelector('.status span')?.textContent.trim().toLowerCase() || '';
       const receiveTxt = tr.querySelector('.receive')?.textContent.trim() || '—';
-      const stxt = tr.querySelector('.status')?.textContent.toLowerCase() || '';
 
-      const matchesQ = !q || txId.includes(q) || user.includes(q) || item.includes(q);
-      const matchesStatus = !status || stxt.includes(status);
+      // ✅ Search filter
+      const matchesSearch = !q || txId.includes(q) || user.includes(q) || item.includes(q);
 
+      // ✅ Status filter
+      const matchesStatus = !selectedStatus || statusText === selectedStatus;
+
+      // ✅ Date filter
       let matchesDate = true;
       if (from || to) {
-        const d = toDate(receiveTxt); // using date_receive as the index date
+        const d = parseDate(receiveTxt);
         if (from && (!d || d < from)) matchesDate = false;
         if (to) {
-          // include the end day fully
-          const end = new Date(to); end.setDate(end.getDate() + 1);
+          const end = new Date(to);
+          end.setDate(end.getDate() + 1);
           if (!d || d >= end) matchesDate = false;
         }
       }
 
-      const visible = matchesQ && matchesStatus && matchesDate && shown < limit;
+      const visible = matchesSearch && matchesStatus && matchesDate && shown < limit;
       tr.style.display = visible ? '' : 'none';
       if (visible) shown++;
     });
   }
 
   [searchBox, statusFilter, fromDate, toDate, rowsPerPage].forEach(el => {
-    if (el) {
-      el.addEventListener('input', apply);
-      el.addEventListener('change', apply);
-    }
+    el?.addEventListener('input', applyFilters);
+    el?.addEventListener('change', applyFilters);
   });
 
-  apply();
+  applyFilters();
 })();
 </script>
 
-<style>
-.history-logs {
-    font-family: "Inter", sans-serif;
-    padding: 20px;
-}
-
-.filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 15px;
-    align-items: center;
-}
-
-.filters input,
-.filters select {
-    padding: 6px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 14px;
-}
-
-.table-wrapper {
-    overflow-x: auto;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-}
-
-.history-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-}
-
-.history-table th {
-    text-align: left;
-    padding: 10px;
-    background: #f9fafb;
-    border-bottom: 1px solid #e5e7eb;
-    font-weight: 600;
-}
-
-.history-table td {
-    padding: 10px;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.history-table tr:hover {
-    background: #f3f4f6;
-}
-</style>
 {% endblock %}

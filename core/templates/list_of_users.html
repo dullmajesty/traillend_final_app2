@@ -1,131 +1,219 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="users-container">
+<div class="users-wrapper">
+  <header class="users-header">
+    <h1>Users Management</h1>
+    <p class="subtitle">View and manage all registered borrowers and administrators.</p>
+  </header>
 
-    <h2>Users List</h2>
-    <p>Total profiles: {{ profiles|length }}</p>
+  <!-- Filters -->
+  <div class="filter-panel">
+    <input type="text" id="searchText" placeholder="Search name or username" onkeyup="filterTable()">
+    <select id="statusFilter" onchange="filterTable()">
+      <option value="">All statuses</option>
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+    <input type="date" id="fromDate" onchange="filterTable()">
+    <input type="date" id="toDate" onchange="filterTable()">
+    <select id="rowsFilter" onchange="filterTable()">
+      <option value="10">10 rows</option>
+      <option value="25">25 rows</option>
+      <option value="50">50 rows</option>
+    </select>
+  </div>
 
-
-    <!-- Filters -->
-    <div class="filters">
-        <input type="text" placeholder="Search name or email" id="searchText" onkeyup="filterTable()">
-        <select id="statusFilter" onchange="filterTable()">
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-        </select>
-        <input type="date" id="fromDate" onchange="filterTable()">
-        <input type="date" id="toDate" onchange="filterTable()">
-        <select id="rowsFilter" onchange="filterTable()">
-            <option value="10">10 rows</option>
-            <option value="25">25 rows</option>
-            <option value="50">50 rows</option>
-        </select>
+  <!-- Table -->
+  <section class="card table-card">
+    <div class="table-header">
+      <h2>Users List</h2>
+      <p class="muted">Total Profiles: <strong>{{ profiles|length }}</strong></p>
     </div>
 
-    <!-- Users Table -->
-    <table id="usersTable">
+    <div class="table-container">
+      <table id="usersTable" class="table">
         <thead>
-            <tr>
-                <th>ID</th>
-                <th>Full Name</th>
-                <th>Username</th>
-                <th>Contact Number</th>
-                <th>Address</th>
-                <th>Status</th>
-                <th>Date Joined</th>
-            </tr>
+          <tr>
+            <th>ID</th>
+            <th>Full Name</th>
+            <th>Username</th>
+            <th>Contact Number</th>
+            <th>Address</th>
+            <th>Status</th>
+            <th>Date Joined</th>
+          </tr>
         </thead>
         <tbody>
-            {% for profile in profiles %}
-            <tr>
-                <td>{{ profile.id }}</td>
-                <td>{{ profile.full_name }}</td>
-                <td>{{ profile.user.username }}</td>
-                <td>{{ profile.contact_number }}</td>
-                <td>{{ profile.address }}</td>
-                <td>
-                    {% if profile.user.is_active %}
-                        <span class="status active">Active</span>
-                    {% else %}
-                        <span class="status inactive">Inactive</span>
-                    {% endif %}
-                </td>
-                <td>{{ profile.user.date_joined|date:"Y-m-d H:i" }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="8">No users found.</td></tr>
-            {% endfor %}
+          {% for profile in profiles %}
+          <tr>
+            <td>{{ profile.id }}</td>
+            <td>{{ profile.full_name }}</td>
+            <td>{{ profile.user.username }}</td>
+            <td>{{ profile.contact_number }}</td>
+            <td>{{ profile.address }}</td>
+            <td>
+              {% if profile.user.is_active %}
+              <span class="status active">Active</span>
+              {% else %}
+              <span class="status inactive">Inactive</span>
+              {% endif %}
+            </td>
+            <td>{{ profile.user.date_joined|date:"Y-m-d H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7">No users found.</td></tr>
+          {% endfor %}
         </tbody>
-    </table>
+      </table>
+    </div>
+  </section>
 </div>
 
 <style>
-.users-container {
-    padding: 15px;
-    font-size: 14px;
+/* ========== Layout & Typography ========== */
+.users-wrapper {
+  max-width: 1200px;
+  font-family: "Poppins", sans-serif;
 }
 
-.filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 12px;
+.users-header h1 {
+  font-size: 26px;
+  margin-bottom: 6px;
+  color: #111827;
 }
 
-.filters input, .filters select {
-    padding: 4px 6px;
-    font-size: 14px;
-    border: 1px solid #aaa;
-    border-radius: 4px;
+.subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 18px;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 8px;
+/* ========== Filter Section ========== */
+.filter-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  padding: 14px;
+  border-radius: 10px;
+  margin-bottom: 20px;
 }
 
-th, td {
-    border: 1px solid #ddd;
-    padding: 6px;
-    text-align: center;
+.filter-panel input,
+.filter-panel select {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 150px;
 }
 
-th {
-    background: #f7f7f7;
+.filter-panel input:focus,
+.filter-panel select:focus {
+  outline: none;
+  border-color: #2b7cff;
+  box-shadow: 0 0 0 2px rgba(43,124,255,0.1);
 }
 
+/* ========== Card Table ========== */
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.table-header h2 {
+  font-size: 18px;
+  color: #111827;
+  margin: 0;
+}
+
+.muted {
+  font-size: 13px;
+  color: #334155;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.table th {
+  background: #f1f5f9;
+  font-weight: 600;
+  color: #334155;
+  font-size: 13px;
+}
+
+.table tr:hover {
+  background: #f9fafb;
+  transition: background 0.2s;
+}
+
+/* ========== Status Badges ========== */
 .status {
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
 }
-.status.active { background: #d4edda; color: #155724; }
-.status.inactive { background: #f8d7da; color: #721c24; }
+
+.status.active { background: #dcfce7; color: #166534; }
+.status.inactive { background: #fee2e2; color: #991b1b; }
+
+/* ========== Responsive ========== */
+@media (max-width: 900px) {
+  .filter-panel { flex-direction: column; }
+  .filter-panel input, .filter-panel select { width: 100%; }
+  .table-container { overflow-x: auto; }
+}
 </style>
 
 <script>
 function filterTable() {
-    let input = document.getElementById('searchText').value.toLowerCase();
-    let statusFilter = document.getElementById('statusFilter').value;
-    let table = document.getElementById('usersTable');
-    let rows = table.getElementsByTagName('tr');
+  const search = document.getElementById('searchText').value.toLowerCase();
+  const statusFilter = document.getElementById('statusFilter').value.toLowerCase();
+  const table = document.getElementById('usersTable');
+  const rows = table.getElementsByTagName('tr');
 
-    for (let i = 1; i < rows.length; i++) {
-        let cells = rows[i].getElementsByTagName('td');
-        if (!cells.length) continue;
-        let fullName = cells[1].textContent.toLowerCase();
-        let username = cells[2].textContent.toLowerCase();
-        let status = cells[6].textContent.toLowerCase();
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i].getElementsByTagName('td');
+    if (!cells.length) continue;
 
-        let matchesSearch = fullName.includes(input) || username.includes(input);
-        let matchesStatus = !statusFilter || status.includes(statusFilter);
+    const fullName = cells[1].textContent.toLowerCase();
+    const username = cells[2].textContent.toLowerCase();
+    const status = cells[5].textContent.toLowerCase();
 
-        rows[i].style.display = (matchesSearch && matchesStatus) ? '' : 'none';
-    }
+    const matchesSearch = fullName.includes(search) || username.includes(search);
+    const matchesStatus = !statusFilter || status.includes(statusFilter);
+
+    rows[i].style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+  }
 }
 </script>
 {% endblock %}

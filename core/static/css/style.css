@@ -169,7 +169,6 @@ body {
   flex: 1;
   margin-left: 225px;
   margin-top: 60px;
-  margin-right: 300px;
   background: #f9fafc;
   padding: 20px;
   overflow: auto;
@@ -181,10 +180,17 @@ body {
   will-change: opacity, transform;
 }
 
-body.ready .content {
-  opacity: 1;
-  transform: none;
+/* ✅ Dashboard only (with right panel) */
+body.dashboard .content {
+  margin-right: 300px;
 }
+
+/* ✅ All other pages full width */
+body:not(.dashboard) .content {
+  margin-right: 0;
+  overflow-x: hidden;
+}
+
 
 .content.fullwidth {
   margin-right: 0 !important;

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% load static %}
-{% block content %}
 
+{% block content %}
 <section class="item-detail-page">
-  <!-- ✅ CONTAINER: DETAILS + CALENDAR SIDE BY SIDE -->
+  <!-- 🔹 TOP ROW: ITEM DETAILS + CALENDAR -->
   <div class="item-calendar-row">
-    <!-- ITEM CARD -->
+    <!-- ITEM DETAILS CARD -->
     <div class="item-card">
       <div class="item-header">
         <h2>{{ item.name }}</h2>
@@ -32,37 +32,41 @@
       </div>
     </div>
 
-    <!-- CALENDAR -->
+    <!-- SMALL CALENDAR -->
     <div class="calendar-container">
-      <h3>Reservation & Availability Calendar</h3>
+      <h3>Calendar</h3>
       <div id="itemCalendar"></div>
     </div>
   </div>
 
-  <!-- MODAL -->
-  <div id="dateModal" class="modal">
-    <div class="modal-content">
-      <span id="closeModal" class="close">&times;</span>
-      <h3 id="modalDate">Selected Date</h3>
-
-      <table class="reservation-table">
-        <thead>
-          <tr><th>Borrower</th><th>Date</th><th>Status</th></tr>
-        </thead>
-        <tbody id="reservationList">
-          <tr><td colspan="3">Loading...</td></tr>
-        </tbody>
-      </table>
-
-      <div class="reservation-actions">
-        <button id="blockBtn" class="btn-primary">Block / Unblock Date</button>
-        <button id="cancelBtn" class="btn-danger">Close</button>
+  <!-- 🔹 LOWER SECTION: RESERVATION TABLE -->
+  <div class="reservation-section">
+    <div class="table-header">
+      <h3 id="selectedDateTitle">Select a date from the calendar</h3>
+      <div class="table-actions">
+        <button id="cancelAllBtn" class="btn-warning" style="display:none;">Cancel All Reservations</button>
+        <button id="blockBtn" class="btn-primary" style="display:none;">Block / Unblock Date</button>
       </div>
     </div>
+
+    <table class="reservation-table" id="reservationTable">
+      <thead>
+        <tr>
+          <th>Borrower</th>
+          <th>Borrowed Date</th>
+          <th>Return Date</th>
+          <th>Quantity</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="reservationBody">
+        <tr><td colspan="5" style="text-align:center;">No date selected</td></tr>
+      </tbody>
+    </table>
   </div>
 </section>
 
-<!-- ✅ FullCalendar -->
+<!-- ✅ FULLCALENDAR -->
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
@@ -74,7 +78,6 @@ body {
   color: #1f2937;
 }
 
-/* FLEX ROW */
 .item-calendar-row {
   display: flex;
   justify-content: center;
@@ -85,25 +88,21 @@ body {
   flex-wrap: wrap;
 }
 
-/* ITEM CARD */
 .item-card {
-  flex: 1 1 45%;
+  flex: 1 1 50%;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
   padding: 25px;
   min-width: 320px;
 }
+
 .item-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.item-header h2 {
-  color: #1e3a8a;
-  font-size: 1.4rem;
-  margin-bottom: 0;
-}
+
 .category-tag {
   background: #2563eb;
   color: #fff;
@@ -112,122 +111,105 @@ body {
   font-size: 0.85rem;
   font-weight: 500;
 }
+
 .item-body {
   display: flex;
   gap: 18px;
   flex-wrap: wrap;
   margin-top: 15px;
 }
+
 .item-image img {
-  width: 160px;
-  height: 160px;
+  width: 150px;
+  height: 150px;
   object-fit: cover;
   border-radius: 12px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
 }
-.item-info p {
-  margin-bottom: 8px;
-  font-size: 0.9rem;
-}
+
 .status.available { color: #16a34a; }
 .status.not { color: #dc2626; }
 
-/* CALENDAR */
 .calendar-container {
-  flex: 1 1 50%;
+  flex: 1 1 35%;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
   padding: 20px;
-  min-width: 400px;
+  min-width: 350px;
 }
+
 .calendar-container h3 {
   text-align: center;
   color: #1f2937;
-  margin-bottom: 10px;
   font-weight: 600;
-}
-#itemCalendar {
-  height: 430px;
-  font-size: 0.85rem;
+  margin-bottom: 10px;
 }
 
-/* MODAL */
-.modal {
-  display: none;
-  position: fixed;
-  z-index: 1000;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0,0,0,0.6);
-  justify-content: center;
-  align-items: center;
+#itemCalendar {
+  height: 350px;
 }
-.modal-content {
+
+/* TABLE SECTION */
+.reservation-section {
   background: #fff;
-  padding: 25px;
   border-radius: 12px;
-  width: 90%;
-  max-width: 480px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-  position: relative;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  padding: 25px;
+  max-width: 1100px;
+  margin: 25px auto;
 }
-.close {
-  position: absolute;
-  top: 10px; right: 15px;
-  cursor: pointer;
-  font-size: 22px;
-  color: #6b7280;
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
 }
+
+.table-header h3 {
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.table-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .reservation-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 15px 0;
+  margin-top: 15px;
 }
+
 .reservation-table th, .reservation-table td {
   border: 1px solid #e5e7eb;
   padding: 10px;
   text-align: left;
-  font-size: 0.9rem;
 }
+
 .reservation-table th {
   background: #f3f4f6;
-  color: #374151;
   font-weight: 600;
 }
-.reservation-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
+
 .btn-primary {
   background: #2563eb;
   color: #fff;
   border: none;
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 6px;
   cursor: pointer;
-  font-weight: 500;
-}
-.btn-danger {
-  background: #dc2626;
-  color: #fff;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
 }
 .btn-warning {
   background: #f59e0b;
   color: #fff;
   border: none;
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 6px;
   cursor: pointer;
-  font-weight: 500;
 }
-.btn-warning:hover { background: #d97706; }
 
 /* TOAST */
 .toast {
@@ -247,40 +229,34 @@ body {
 .toast.success { background: #16a34a; }
 .toast.error { background: #dc2626; }
 
-/* RESPONSIVE */
 @media (max-width: 900px) {
   .item-calendar-row { flex-direction: column; align-items: center; }
-  .item-card, .calendar-container { width: 90%; }
+  .calendar-container, .item-card { width: 90%; }
 }
 </style>
 
 <!-- ✅ SCRIPT -->
-{{ item.item_id|json_script:"item-id" }}
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
-  const itemId = JSON.parse(document.getElementById("item-id").textContent);
-  const modal = document.getElementById('dateModal');
-  const closeModal = document.getElementById('closeModal');
-  const blockBtn = document.getElementById('blockBtn');
-  const cancelBtn = document.getElementById('cancelBtn');
-  const modalDate = document.getElementById('modalDate');
-  const reservationList = document.getElementById('reservationList');
+  const itemId = {{ item.item_id }};
+  const calendarEl = document.getElementById("itemCalendar");
+  const reservationBody = document.getElementById("reservationBody");
+  const selectedDateTitle = document.getElementById("selectedDateTitle");
+  const cancelAllBtn = document.getElementById("cancelAllBtn");
+  const blockBtn = document.getElementById("blockBtn");
 
-  let selectedDate = null;
-  let calendar;
   let allReservations = [];
   let blockedDates = new Set();
+  let selectedDate = null;
+  let calendarData = {};
 
-  function showToast(message, type = "info") {
+  function showToast(message, type="info") {
     const toast = document.createElement("div");
-    toast.textContent = message;
     toast.className = `toast ${type}`;
+    toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => toast.classList.add("show"), 100);
-    setTimeout(() => {
-      toast.classList.remove("show");
-      setTimeout(() => toast.remove(), 300);
-    }, 3000);
+    setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 300); }, 3000);
   }
 
   async function fetchCalendarData() {
@@ -291,83 +267,81 @@ document.addEventListener("DOMContentLoaded", async () => {
     return data;
   }
 
+  function renderTable(dateStr) {
+    selectedDate = dateStr;
+    selectedDateTitle.textContent = `Reservations for ${dateStr}`;
+    reservationBody.innerHTML = "";
+    
+    const dayReservations = (calendarData.reservations_by_date && calendarData.reservations_by_date[dateStr]) || [];
+
+    if (dayReservations.length > 0) {
+      cancelAllBtn.style.display = "inline-block";
+      blockBtn.style.display = "none";
+      dayReservations.forEach(r => {
+        reservationBody.innerHTML += `
+          <tr>
+            <td>${r.name}</td>
+            <td>${r.date_borrowed}</td>
+            <td>${r.date_return}</td>
+            <td>${r.quantity}</td>
+            <td>${r.status}</td>
+          </tr>`;
+      });
+    } else {
+      reservationBody.innerHTML = `<tr><td colspan="5" style="text-align:center;">No reservations found</td></tr>`;
+      cancelAllBtn.style.display = "none";
+      blockBtn.style.display = "inline-block";
+    }
+  }
+
+
   async function initCalendar() {
-    const data = await fetchCalendarData();
+    calendarData = await fetchCalendarData();
     const events = [
-      ...data.reservations.map(r => ({
-        title: `${r.name}`,
+      ...calendarData.reservations.map(r => ({
+        title: r.name,
         start: r.date,
-        color: r.status === "Approved" ? "#16a34a" : "#facc15",
+        color: r.status === "approved" ? "#16a34a" : "#facc15",
       })),
-      ...data.blocked.map(date => ({
+      ...calendarData.blocked.map(date => ({
         title: "Blocked",
         start: date,
         color: "#9ca3af",
       }))
     ];
 
-    calendar = new FullCalendar.Calendar(document.getElementById('itemCalendar'), {
-      initialView: window.innerWidth < 768 ? 'listWeek' : 'dayGridMonth',
-      height: 430,
-      nowIndicator: true,
-      headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
-      events: events,
-      dateClick: (info) => openModal(info.dateStr),
+    calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: "dayGridMonth",
+      height: 350,
+      headerToolbar: { left: "prev,next", center: "title", right: "" },
+      events,
+      dateClick: (info) => {
+        selectedDate = info.dateStr;
+        renderTable(selectedDate);
+      },
     });
+
     calendar.render();
   }
 
-  function openModal(dateStr) {
-    selectedDate = dateStr;
-    modal.style.display = "flex";
-    modalDate.textContent = `Reservations for ${dateStr}`;
-    reservationList.innerHTML = "";
-
-    const dayReservations = allReservations.filter(r => r.date === dateStr);
-    const actionContainer = document.querySelector(".reservation-actions");
-    actionContainer.querySelectorAll(".btn-warning").forEach(btn => btn.remove());
-
-    if (dayReservations.length) {
-      dayReservations.forEach(r => {
-        reservationList.innerHTML += `
-          <tr>
-            <td>${r.name}</td>
-            <td>${r.date}</td>
-            <td>${r.status}</td>
-          </tr>`;
-      });
-
-      const cancelAllBtn = document.createElement("button");
-      cancelAllBtn.className = "btn-warning";
-      cancelAllBtn.textContent = "Cancel All Reservations";
-      cancelAllBtn.onclick = async () => {
-        if (!confirm("Are you sure you want to cancel all reservations for this date?")) return;
-        const res = await fetch(`/api/item/${itemId}/cancel-reservations/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date: selectedDate })
-        });
-        const data = await res.json();
-        showToast(data.message || "Reservations canceled", "success");
-        modal.style.display = "none";
-        calendar.destroy();
-        initCalendar();
-      };
-      actionContainer.prepend(cancelAllBtn);
-    } else {
-      reservationList.innerHTML = `<tr><td colspan="3">No reservations found</td></tr>`;
-    }
-  }
-
-  blockBtn.onclick = async () => {
+  cancelAllBtn.addEventListener("click", async () => {
     if (!selectedDate) return;
-    const hasReservations = allReservations.some(r => r.date === selectedDate && r.status !== "Cancelled");
+    if (!confirm(`Cancel all reservations for ${selectedDate}?`)) return;
 
-    if (hasReservations) {
-      showToast("⚠️ Cancel existing reservations before blocking this date.", "error");
-      return;
-    }
+    const res = await fetch(`/api/item/${itemId}/cancel-reservations/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: selectedDate })
+    });
 
+    const data = await res.json();
+    showToast(data.message || "Reservations cancelled", "success");
+    await initCalendar();
+    renderTable(selectedDate);
+  });
+
+  blockBtn.addEventListener("click", async () => {
+    if (!selectedDate) return;
     const res = await fetch(`/api/item/${itemId}/block-toggle/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -375,14 +349,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     const data = await res.json();
     showToast(`Date ${data.status}: ${data.date}`, "success");
-    modal.style.display = "none";
-    calendar.destroy();
-    initCalendar();
-  };
-
-  cancelBtn.onclick = () => modal.style.display = "none";
-  closeModal.onclick = () => modal.style.display = "none";
-  window.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
+    await initCalendar();
+    renderTable(selectedDate);
+  });
 
   initCalendar();
 });

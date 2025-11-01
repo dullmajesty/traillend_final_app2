@@ -50,7 +50,7 @@
         <i class="fa-solid fa-clock-rotate-left"></i> Transaction Log
       </a>
 
-      <a href="{% url 'damage_report' %}" class="{% if request.resolver_match.url_name == 'damage_report' %}active{% endif %}">
+      <a href="{% url 'damage_report_list' %}" class="{% if request.resolver_match.url_name == 'damage_report_list' %}active{% endif %}">
         <i class="fa-solid fa-file-lines"></i> Damage Report
       </a>
 
@@ -62,7 +62,7 @@
         <i class="fa-solid fa-users"></i> List of Users
       </a>
 
-      <a href="{% url 'change_pass' %}" class="{% if request.resolver_match.url_name == 'change_pass' %}active{% endif %}">
+      <a href="{% url 'change_password' %}" class="{% if request.resolver_match.url_name == 'change_password' %}active{% endif %}">
         <i class="fa-solid fa-key"></i> Change Pass
       </a>
 
@@ -352,5 +352,14 @@ function togglePendingPanel() {
   panel.style.display = isVisible ? "none" : "block";
 }
 </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  if (window.location.pathname.includes("dashboard")) {
+    document.body.classList.add("dashboard");
+  }
+});
+</script>
+
 </body>
 </html>

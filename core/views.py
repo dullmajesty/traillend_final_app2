@@ -24,8 +24,10 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes, authentication_classes, parser_classes
 
-# ✅ import your models (Reservation was missing before)
-from .models import UserBorrower, Item, Reservation, Feedback
+# import your models (Reservation was missing before)
+from .models import UserBorrower, Item, Reservation, Feedback, DamageReport, BlockedDate
+from django.contrib.auth.hashers import check_password
+from django.contrib.auth import update_session_auth_hash
 
 # If you need DRF perms later:
 # from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -102,12 +104,12 @@ def dashboard(request):
     total_transactions = Reservation.objects.count()
     total_borrowed = Reservation.objects.filter(status__iexact='in use').count()
 
-    # 🟢 PIE - Item Category Distribution
+    # PIE - Item Category Distribution
     category_data = Item.objects.values("category").annotate(count=Count("item_id"))
     pie_labels = [c["category"] for c in category_data]
     pie_values = [c["count"] for c in category_data]
 
-    # 🟠 BAR - Monthly Transactions (based on date_borrowed)
+    # BAR - Monthly Transactions (based on date_borrowed)
     current_year = timezone.now().year
     monthly_data = (
         Reservation.objects.filter(date_borrowed__year=current_year)
@@ -122,7 +124,7 @@ def dashboard(request):
     bar_labels = month_names
     bar_values = [month_counts.get(i, 0) for i in range(1, 13)]
 
-    # 🟣 DONUT - Borrowed vs Returned
+    # DONUT - Borrowed vs Returned
     borrowed = Reservation.objects.filter(status__iexact='in use').count()
     returned = Reservation.objects.filter(status__iexact='returned').count()
     total = borrowed + returned
@@ -243,7 +245,7 @@ def verify_reset_code(request):
                 request.session.pop('reset_email', None)
                 request.session.pop('reset_code', None)
 
-                # ✅ Show success message (used by popup)
+                # Show success message (used by popup)
                 messages.success(request, "Your password has been successfully changed.")
                 return render(request, "verify_reset_code.html")
 
@@ -354,46 +356,37 @@ def verification(request):
     return render(request, 'verification.html')
 
 def transaction_log(request):
-    """
-    Show all reservations except pending ones (approved, borrowed, returned, rejected, etc.)
-    """
-    qs = (
-        Reservation.objects
-        .exclude(status='pending')
-        .select_related('item', 'userborrower')
-        .order_by('-id')
-    )
+    qs = Reservation.objects.select_related('item', 'userborrower').order_by('-id')
 
     transactions = []
     for r in qs:
         borrower_name = getattr(r.userborrower, "full_name", "Unknown")
         item_name = getattr(r.item, "name", "Unknown")
         quantity = getattr(r, "quantity", 1)
-        contact = getattr(r, "contact", "N/A")
-        
-        # 🔹 Contact logic: prefer reservation contact, else borrower's contact_number
+
+        # use borrower's contact if reservation contact is blank
         contact = getattr(r, "contact", None)
         if not contact or contact.strip().lower() in ["", "n/a"]:
             contact = getattr(r.userborrower, "contact_number", "N/A")
 
-        # map your model fields properly
         transactions.append({
             "transaction_id": r.transaction_id or f"T{r.id:06d}",
             "user_name": borrower_name,
             "item_name": item_name,
             "quantity": quantity,
             "contact": contact,
-            "date": r.date_borrowed,           # 🟢 replaced 'date' with 'date_borrowed'
-            "date_receive": r.date_receive,     # existing field, fine
-            "date_returned": r.date_returned,   # existing field, fine
-            "status": r.status.capitalize(),
+            "date_borrowed": r.date_borrowed,    
+            "date_receive": r.date_receive,
+            "date_returned": r.date_returned,
+            "status": r.status,
+            "created_at": r.created_at,         
+            "approved_at": r.approved_at,
         })
 
     return render(request, "transaction_history.html", {"transactions": transactions})
 
-def damage_report(request):
-    return render(request, 'damage.html')
 
+# Statistics
 
 @login_required
 def statistics(request):
@@ -476,11 +469,120 @@ def statistics(request):
 @login_required
 def statistics_data(request):
     """Return filtered statistics as JSON (for AJAX updates)."""
-    from django.utils.dateparse import parse_date
-
     start_date = request.GET.get("start")
     end_date = request.GET.get("end")
-    item_filter = request.GET.get("items")
+    status_filter = request.GET.get("status")
+    category_filter = request.GET.get("category")
+
+    # Base queryset
+    qs = Reservation.objects.select_related("item", "userborrower").all()
+
+    # --- Safely apply filters ---
+    if start_date:
+        qs = qs.filter(date_borrowed__gte=parse_date(start_date))
+    if end_date:
+        qs = qs.filter(date_borrowed__lte=parse_date(end_date))
+    if status_filter and status_filter != "all":
+        qs = qs.filter(status__iexact=status_filter)
+    if category_filter and category_filter != "all":
+        qs = qs.filter(item__category__iexact=category_filter)
+
+    # ✅ No need to get `categories` here — that’s for the main view (HTML page), not the JSON response
+    # categories = Item.objects.values_list('category', flat=True).distinct()
+
+    # --- Transactions ---
+    transactions = [
+        {
+            "transaction_id": r.transaction_id,
+            "item_id": getattr(r.item, "item_id", ""),
+            "item_name": r.item.name if r.item else "Unknown",
+            "borrower_name": r.userborrower.full_name if r.userborrower else "Unknown",
+            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d") if r.date_borrowed else "—",
+            "returned_at": r.date_return.strftime("%Y-%m-%d") if r.date_return else "—",
+            "status": r.status.capitalize(),
+        }
+        for r in qs.order_by("-date_borrowed")
+    ]
+
+    # --- Summary ---
+    total_borrowings = qs.count()
+
+    most_item_qs = (
+        qs.values("item__name")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+        .first()
+    )
+    most_item = most_item_qs["item__name"] if most_item_qs else "—"
+
+    top_borrower_qs = (
+        qs.values("userborrower__full_name")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+        .first()
+    )
+    top_borrower = top_borrower_qs["userborrower__full_name"] if top_borrower_qs else "—"
+
+    # --- Chart Data ---
+   # --- Chart: Borrowings by Date + Status ---
+    borrowings_by_date = (
+        qs.values("date_borrowed", "status")
+        .annotate(count=Count("id"))
+        .order_by("date_borrowed")
+    )
+
+    # Group data by status for multi-line chart
+    chart_data = {}
+    for b in borrowings_by_date:
+        date_str = b["date_borrowed"].strftime("%Y-%m-%d") if b["date_borrowed"] else "Unknown"
+        status = b["status"].capitalize()
+        if status not in chart_data:
+            chart_data[status] = {}
+        chart_data[status][date_str] = b["count"]
+
+    # Collect all unique dates (x-axis labels)
+    all_dates = sorted({b["date_borrowed"].strftime("%Y-%m-%d") for b in borrowings_by_date if b["date_borrowed"]})
+
+    # Build datasets for each status
+    datasets = []
+    color_palette = {
+        "Pending": "#f59e0b",
+        "Approved": "#22c55e",
+        "In use": "#3b82f6",
+        "Returned": "#6366f1",
+        "Rejected": "#ef4444",
+        "Cancelled": "#9ca3af",
+    }
+
+    for status, date_counts in chart_data.items():
+        data = [date_counts.get(d, 0) for d in all_dates]
+        datasets.append({
+            "label": status,
+            "data": data,
+            "borderColor": color_palette.get(status, "#888"),
+            "backgroundColor": color_palette.get(status, "#888"),
+            "tension": 0.3,
+            "fill": False,
+            "borderWidth": 2
+        })
+
+    return JsonResponse({
+        "labels": all_dates,
+        "datasets": datasets,
+        "total_borrowings": total_borrowings,
+        "most_item": most_item,
+        "top_borrower": top_borrower,
+        "transactions": transactions,
+    })
+
+
+
+@login_required
+def export_excel(request):
+    start_date = request.GET.get("start")
+    end_date = request.GET.get("end")
+    status_filter = request.GET.get("status")
+    category_filter = request.GET.get("category")
 
     qs = Reservation.objects.select_related("item", "userborrower").all()
 
@@ -488,82 +590,19 @@ def statistics_data(request):
         qs = qs.filter(date_borrowed__gte=parse_date(start_date))
     if end_date:
         qs = qs.filter(date_borrowed__lte=parse_date(end_date))
-    if item_filter and item_filter != "all":
-        qs = qs.filter(item_id=item_filter)
-
-    # ---- Transactions ----
-    transactions = [
-        {
-            "transaction_id": r.transaction_id,
-            "item_id": r.item.item_id,
-            "item_name": r.item.name,
-            "borrower_name": r.userborrower.full_name if r.userborrower else "Unknown",
-            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d"),
-            "returned_at": r.date_returned.strftime("%Y-%m-%d") if r.date_returned else "—",
-            "status": r.status.capitalize(),
-        }
-        for r in qs.order_by("-date_borrowed")
-    ]
-
-    # ---- Summary ----
-    total_borrowings = qs.count()
-    most_item = (
-        qs.values("item__name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-        .first()
-    )
-    most_item = most_item["item__name"] if most_item else "—"
-
-    top_borrower = (
-        qs.values("userborrower__full_name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-        .first()
-    )
-    top_borrower = top_borrower["userborrower__full_name"] if top_borrower else "—"
-
-    # ---- Chart ----
-    borrowings_by_date = (
-        qs.values("date_borrowed")
-        .annotate(count=Count("id"))
-        .order_by("date_borrowed")
-    )
-    labels = [b["date_borrowed"].strftime("%Y-%m-%d") for b in borrowings_by_date]
-    counts = [b["count"] for b in borrowings_by_date]
-
-    data = {
-        "labels": labels,
-        "counts": counts,
-        "total_borrowings": total_borrowings,
-        "most_item": most_item,
-        "top_borrower": top_borrower,
-        "transactions": transactions,
-    }
-    return JsonResponse(data)
-
-@login_required
-def export_excel(request):
-    start_date = request.GET.get("start")
-    end_date = request.GET.get("end")
-    item_filter = request.GET.get("items")
-
-    qs = Reservation.objects.select_related("item", "userborrower").all()
-    if start_date:
-        qs = qs.filter(date_borrowed__gte=start_date)
-    if end_date:
-        qs = qs.filter(date_borrowed__lte=end_date)
-    if item_filter and item_filter != "all":
-        qs = qs.filter(item_id=item_filter)
+    if status_filter and status_filter != "all":
+        qs = qs.filter(status__iexact=status_filter)
+    if category_filter and category_filter != "all":
+        qs = qs.filter(item__category__iexact=category_filter)
 
     data = [
         {
             "Transaction ID": r.transaction_id,
-            "Item ID": r.item.item_id,
-            "Item Name": r.item.name,
+            "Item ID": getattr(r.item, "item_id", ""),
+            "Item Name": r.item.name if r.item else "Unknown",
             "Borrower Name": r.userborrower.full_name if r.userborrower else "Unknown",
-            "Borrowed At": r.date_borrowed.strftime("%Y-%m-%d"),
-            "Returned At": r.date_returned.strftime("%Y-%m-%d") if r.date_returned else "—",
+            "Borrowed At": r.date_borrowed.strftime("%Y-%m-%d") if r.date_borrowed else "—",
+            "Returned At": r.date_return.strftime("%Y-%m-%d") if r.date_return else "—",
             "Status": r.status.capitalize(),
         }
         for r in qs
@@ -582,28 +621,33 @@ def export_excel(request):
     return response
 
 
+
 @login_required
 def export_pdf(request):
     start_date = request.GET.get("start")
     end_date = request.GET.get("end")
-    item_filter = request.GET.get("items")
+    status_filter = request.GET.get("status")
+    category_filter = request.GET.get("category")
 
     qs = Reservation.objects.select_related("item", "userborrower").all()
+
     if start_date:
-        qs = qs.filter(date_borrowed__gte=start_date)
+        qs = qs.filter(date_borrowed__gte=parse_date(start_date))
     if end_date:
-        qs = qs.filter(date_borrowed__lte=end_date)
-    if item_filter and item_filter != "all":
-        qs = qs.filter(item_id=item_filter)
+        qs = qs.filter(date_borrowed__lte=parse_date(end_date))
+    if status_filter and status_filter != "all":
+        qs = qs.filter(status__iexact=status_filter)
+    if category_filter and category_filter != "all":
+        qs = qs.filter(item__category__iexact=category_filter)
 
     transactions = [
         {
             "transaction_id": r.transaction_id,
-            "item_id": r.item.item_id,
-            "item_name": r.item.name,
+            "item_id": getattr(r.item, "item_id", ""),
+            "item_name": r.item.name if r.item else "Unknown",
             "borrower_name": r.userborrower.full_name if r.userborrower else "Unknown",
-            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d"),
-            "returned_at": r.date_returned.strftime("%Y-%m-%d") if r.date_returned else "—",
+            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d") if r.date_borrowed else "—",
+            "returned_at": r.date_return.strftime("%Y-%m-%d") if r.date_return else "—",
             "status": r.status.capitalize(),
         }
         for r in qs
@@ -614,6 +658,7 @@ def export_pdf(request):
     response["Content-Disposition"] = 'attachment; filename="transactions_report.pdf"'
     pisa.CreatePDF(io.BytesIO(html.encode("utf-8")), dest=response)
     return response
+
 
 def change_pass(request):
     return render(request, 'change-password.html')
@@ -780,7 +825,7 @@ def reservation_update_api(request, pk: int):
     prev_status = r.status
     qty = r.quantity or 0
 
-    # ✅ Update timestamps
+    # Update timestamps
     if new_status == 'approved':
         r.approved_at = timezone.now()
     elif new_status == 'borrowed':
@@ -788,7 +833,7 @@ def reservation_update_api(request, pk: int):
     elif new_status == 'returned':
         r.date_returned = timezone.now()
 
-    # ✅ Stock management
+    # Stock management
     if prev_status in ['pending', 'approved'] and new_status == 'rejected':
         item.qty += qty
         item.save(update_fields=['qty'])
@@ -809,12 +854,12 @@ def reservation_update_api(request, pk: int):
         else:
             return Response({'status': 'error', 'message': 'Not enough stock'}, status=400)
 
-    # ✅ Save the reservation
+    # Save the reservation
     r.status = new_status
     r.save(update_fields=['status', 'approved_at', 'date_receive', 'date_returned'])
 
     # =========================
-    # ✅ Notifications + Debugging
+    # Notifications + Debugging
     # =========================
     try:
         if new_status == 'approved':
@@ -834,7 +879,8 @@ def reservation_update_api(request, pk: int):
 
             notif = Notification.objects.create(
                 user=r.userborrower,
-                title="Reservation Approved ✅",
+                reservation=r,
+                title="Reservation Approved",
                 message=f"Your reservation for {r.item.name} has been approved!",
                 type="approval"
             )
@@ -847,7 +893,7 @@ def reservation_update_api(request, pk: int):
                 if token_entry:
                     message = messaging.Message(
                         notification=messaging.Notification(
-                            title="Reservation Approved ✅",
+                            title="Reservation Approved",
                             body=f"Your QR code for {r.item.name} is ready!"
                         ),
                         token=token_entry.token,
@@ -859,7 +905,7 @@ def reservation_update_api(request, pk: int):
         elif new_status == 'rejected':
             Notification.objects.create(
                 user=r.userborrower,
-                title="Reservation Declined ❌",
+                title="Reservation Declined",
                 message=f"Your reservation for {r.item.name} was declined.",
                 reason=reason_text or None,
                 type="rejection"
@@ -871,7 +917,7 @@ def reservation_update_api(request, pk: int):
                     body_text = f"Reason: {reason_text or 'No reason provided.'}"
                     message = messaging.Message(
                         notification=messaging.Notification(
-                            title="Reservation Declined ❌",
+                            title="Reservation Declined",
                             body=body_text[:240]
                         ),
                         token=token_entry.token,
@@ -1012,7 +1058,9 @@ class CheckAvailabilityView(APIView):
 
         # Calculate total reserved qty overlapping with requested range
         reserved = total_reserved_qty_for_range(item, start_date, end_date)
-        available = max(item.qty - reserved, 0)
+        total_capacity = get_total_capacity(item)
+        available = max(total_capacity - reserved, 0)
+
 
         if available < want_qty:
             suggestions = find_next_available_dates(item, want_qty, start_date)
@@ -1031,6 +1079,8 @@ class CheckAvailabilityView(APIView):
 class CreateReservationView(APIView):
     """
     Create a new reservation only if the requested quantity and dates are available.
+    Updates item status automatically to 'Available' or 'Fully Reserved'
+    based on real-time overlapping reservations.
     """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -1052,22 +1102,26 @@ class CreateReservationView(APIView):
         borrower = UserBorrower.objects.get(user=user)
         item = Item.objects.select_for_update().get(pk=item_id)
 
-        # 🔹 Compute real-time availability
-        reserved = total_reserved_qty_for_range(item, start_date, end_date)
-        available = max(item.qty - reserved, 0)
+        # Compute total reserved quantity overlapping this range
+        overlapping = Reservation.objects.filter(
+            item=item,
+            status__in=["pending", "approved", "in use"],
+        ).filter(
+            Q(date_borrowed__lte=end_date) & Q(date_return__gte=start_date)
+        )
 
-        if available < qty:
-            suggestions = find_next_available_dates(item, qty, start_date)
-            return Response(
-                {
-                    "detail": "Requested range not available.",
-                    "available_qty": available,
-                    "suggestions": suggestions,
-                },
-                status=409,
-            )
+        total_reserved = overlapping.aggregate(total=Sum("quantity"))["total"] or 0
+        remaining = max(item.qty - total_reserved, 0)
 
-        # 🔹 Create reservation record
+        # Check if enough quantity remains
+        if qty > remaining:
+            return Response({
+                "detail": f"Only {remaining} {item.name}(s) available for the selected date range.",
+                "available_qty": remaining,
+                "suggestion": "Choose another date or lower the quantity.",
+            }, status=409)
+
+        # Create the reservation
         reservation = Reservation.objects.create(
             item=item,
             userborrower=borrower,
@@ -1084,22 +1138,28 @@ class CreateReservationView(APIView):
         reservation.transaction_id = f"T{reservation.id:06d}"
         reservation.save(update_fields=["transaction_id"])
 
-        # 🔹 Notify borrower
+        # Update item status dynamically
+        new_reserved = total_reserved + qty
+        item.status = "Fully Reserved" if new_reserved >= item.qty else "Available"
+        item.save(update_fields=["status"])
+
+        # Notify borrower
         create_notification(
             borrower,
-            title="Pending Reservation 🕒",
-            message=f"Your reservation for {item.name} ({start_date}→{end_date}) is pending approval.",
+            title="Pending Reservation",
+            message=f"Your reservation for {item.name} ({start_date} → {end_date}) is pending approval.",
             notif_type="pending",
+            reservation=reservation
         )
 
-        return Response(
-            {
-                "id": reservation.id,
-                "transaction_id": reservation.transaction_id,
-                "status": reservation.status,
-            },
-            status=201,
-        )
+        return Response({
+            "id": reservation.id,
+            "transaction_id": reservation.transaction_id,
+            "status": reservation.status,
+            "remaining_qty": item.qty - new_reserved,
+            "item_status": item.status
+        }, status=201)
+
 
 
 
@@ -1125,10 +1185,10 @@ def user_profile(request):
             if not borrower:
                 return JsonResponse({"success": False, "message": "No profile found"}, status=404)
 
-            # ✅ Get image URL (check if profile_image field exists)
+            #  Get image URL (check if profile_image field exists)
             image_url = borrower.profile_image.url if getattr(borrower, "profile_image", None) else None
 
-            # ✅ Return all user borrower data including image
+            # Return all user borrower data including image
             return JsonResponse({
                 "success": True,
                 "data": {
@@ -1143,7 +1203,7 @@ def user_profile(request):
         except Exception as e:
             return JsonResponse({"success": False, "message": str(e)}, status=400)
 
-    # ✅ Handle incorrect request methods
+    # Handle incorrect request methods
     return JsonResponse({"success": False, "message": "Invalid request method"}, status=405)
 
 
@@ -1167,12 +1227,12 @@ def update_profile(request):
             if not borrower:
                 return JsonResponse({"success": False, "message": "Profile not found"}, status=404)
 
-            # ✅ Update fields
+            # Update fields
             borrower.full_name = name
             borrower.contact_number = contact_number
             borrower.address = address
 
-            # ✅ Handle image upload
+            # Handle image upload
             if "profile_image" in request.FILES:
                 borrower.profile_image = request.FILES["profile_image"]
 
@@ -1206,33 +1266,74 @@ def save_device_token(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_notifications(request):
-    """Return list of notifications for the logged-in borrower."""
-    user = request.user
-    borrower = getattr(user, 'userborrower', None)
-    if not borrower:
-        return Response({'success': True, 'notifications': []}, status=200)
+    """Return list of notifications for the logged-in borrower with reservation + item details."""
+    try:
+        user = request.user
+        borrower = getattr(user, 'userborrower', None)
+        if not borrower:
+            return Response({'success': True, 'notifications': []}, status=200)
 
+        # Prefetch the linked reservation + item
+        notifications = (
+            Notification.objects
+            .filter(user=borrower)
+            .select_related('reservation__item')
+            .order_by('-created_at')
+        )
 
-    notifications = Notification.objects.filter(user=borrower).order_by('-created_at')
-    data = [
-        {
-            'id': n.id,
-            'title': n.title,
-            'message': n.message,
-            'type': n.type,
-            'qr_code': request.build_absolute_uri(n.qr_code.url) if n.qr_code else None,
-            'is_read': n.is_read,
-            'created_at': n.created_at.strftime('%Y-%m-%d %H:%M'),
+        ICONS = {
+            "approval": "checkmark-circle-outline",
+            "rejection": "close-circle-outline",
+            "pending": "time-outline",
+            "claimed": "cube-outline",
+            "returned": "arrow-undo-outline",
+            "cancelled": "close-circle-outline",
+            "general": "notifications-outline"
         }
-        for n in notifications
-    ]
-    return Response({'success': True, 'notifications': data}, status=200)
+
+        data = []
+        for n in notifications:
+            reservation = getattr(n, "reservation", None)
+            item = getattr(reservation, "item", None)
+
+            transaction_id = getattr(reservation, "transaction_id", None)
+            item_name = getattr(item, "name", None)
+            item_image_url = None
+
+            if item and item.image:
+                item_image_url = request.build_absolute_uri(item.image.url)
+                
+            local_time = timezone.localtime(n.created_at)
+
+            data.append({
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "reason": n.reason,
+                "type": n.type,
+                "icon": ICONS.get(n.type, "notifications-outline"),
+                "is_read": n.is_read,
+                "created_at": local_time.strftime("%Y-%m-%d %I:%M %p"),
+                "qr_code": request.build_absolute_uri(n.qr_code.url) if n.qr_code else None,
+                "transaction_id": transaction_id,     # ✅ Will now show properly
+                "item_name": item_name,               # ✅ Will now show properly
+                "quantity": getattr(reservation, "quantity", None),
+                "image_url": item_image_url,
+            })
+
+        return Response({"success": True, "notifications": data}, status=200)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({"success": False, "error": str(e)}, status=500)
 
 
-def create_notification(borrower, title, message, notif_type='general', qr_file=None):
+def create_notification(borrower, title, message, notif_type='general', qr_file=None, reservation=None):
     """Reusable helper to create both in-app + push notification."""
     notif = Notification.objects.create(
         user=borrower,
+        reservation=reservation,  # ✅ Link to reservation so app sees item details
         title=title,
         message=message,
         type=notif_type
@@ -1241,7 +1342,7 @@ def create_notification(borrower, title, message, notif_type='general', qr_file=
     if qr_file:
         notif.qr_code.save(f"qr_{borrower.user.username}.png", qr_file)
 
-    # 🔔 Optional push notification
+    # Optional push notification
     try:
         token_entry = DeviceToken.objects.filter(user=borrower.user).last()
         if token_entry:
@@ -1254,9 +1355,11 @@ def create_notification(borrower, title, message, notif_type='general', qr_file=
             )
             messaging.send(push_message)
     except Exception as e:
-        print("⚠️ Error sending push notification:", e)
+        print("Error sending push notification:", e)
 
     return notif
+
+
 
 
 @api_view(['PATCH'])
@@ -1296,7 +1399,7 @@ def user_reservations(request):
             'status': r.status,
             'priority': r.priority,
             'message': r.message or '',
-            'image_url': image_url,  # ✅ include image
+            'image_url': image_url, 
         })
 
     return Response({'success': True, 'reservations': data}, status=200)
@@ -1320,7 +1423,7 @@ def cancel_reservation(request, pk):
         reservation.status = 'cancelled'
         reservation.save()
 
-        # ✅ Create Cancellation Notification
+        # Create Cancellation Notification
         create_notification(
             borrower,
             title="Reservation Cancelled ❌",
@@ -1333,15 +1436,11 @@ def cancel_reservation(request, pk):
         return Response({'success': False, 'message': 'Reservation not found.'}, status=404)
 
 
-# ✅ NEW — Dynamic availability for a single date
+# NEW — Dynamic availability for a single date
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def item_availability(request, item_id):
-    """
-    Returns availability details for a specific date.
-    Example: /api/items/5/availability/?date=2025-10-27
-    """
-    from datetime import datetime, timedelta, date
+    from datetime import datetime, timedelta
 
     date_str = request.GET.get("date")
     if not date_str:
@@ -1357,36 +1456,31 @@ def item_availability(request, item_id):
     except Item.DoesNotExist:
         return Response({"error": "Item not found"}, status=404)
 
-    # ✅ Find reservations overlapping this date
+    total_capacity = get_total_capacity(item)
+
     overlapping = Reservation.objects.filter(
         item=item,
-        status__in=["pending", "approved"],
+        status__in=["pending", "approved", "in use"],
         date_borrowed__lte=selected_date,
         date_return__gte=selected_date,
     )
+    reserved = overlapping.aggregate(total=Sum("quantity"))["total"] or 0
+    available_qty = max(total_capacity - reserved, 0)
 
-    reserved_qty = sum(r.quantity for r in overlapping)
-    total_qty = item.qty or 0
-    available_qty = max(total_qty - reserved_qty, 0)
+    status = "fully_reserved" if available_qty == 0 else "available"
 
-    # ✅ If no overlapping reservations, mark as available
-    if not overlapping.exists():
-        status = "available"
-    else:
-        status = "fully_reserved" if available_qty <= 0 else "available"
-
-    # ✅ Find the next available date (up to 30 days ahead)
+    # Next suggested free date (optional)
     suggested_date = None
     if status == "fully_reserved":
         next_day = selected_date + timedelta(days=1)
         for _ in range(30):
-            overlapping_next = Reservation.objects.filter(
+            r_next = Reservation.objects.filter(
                 item=item,
-                status__in=["pending", "approved"],
+                status__in=["pending", "approved", "in use"],
                 date_borrowed__lte=next_day,
                 date_return__gte=next_day,
-            )
-            if not overlapping_next.exists():
+            ).aggregate(total=Sum("quantity"))["total"] or 0
+            if total_capacity - r_next > 0:
                 suggested_date = next_day.isoformat()
                 break
             next_day += timedelta(days=1)
@@ -1396,19 +1490,13 @@ def item_availability(request, item_id):
         "item_name": item.name,
         "date": selected_date.isoformat(),
         "status": status,
-        "total_qty": total_qty,
         "available_qty": available_qty,
         "suggested_date": suggested_date,
     }, status=200)
 
-    
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def item_availability_map(request, item_id):
-    """
-    Returns a 60-day calendar map of reserved/available dates.
-    Marks only dates that overlap with existing reservations as 'fully_reserved'.
-    """
     from datetime import date, timedelta
 
     try:
@@ -1416,12 +1504,20 @@ def item_availability_map(request, item_id):
     except Item.DoesNotExist:
         return Response({"error": "Item not found"}, status=404)
 
+    total_capacity = get_total_capacity(item)
+
     reservations = list(
         Reservation.objects.filter(
             item=item,
-            status__in=["pending", "approved"]
+            status__in=["pending", "approved", "in use"]
         ).values("date_borrowed", "date_return", "quantity")
     )
+
+    blocked_dates = set(
+        b.date if isinstance(b.date, date) else b.date.date()
+        for b in BlockedDate.objects.filter(item=item)
+    )
+
 
     start = date.today()
     end = start + timedelta(days=60)
@@ -1429,16 +1525,30 @@ def item_availability_map(request, item_id):
     days = {}
     current = start
     while current <= end:
-        is_reserved = any(
-            res["date_borrowed"] <= current <= res["date_return"]
-            for res in reservations
-        )
+        if current in blocked_dates:
+            days[current.isoformat()] = {
+                "status": "blocked",
+                "reserved_qty": 0,
+                "available_qty": 0,
+            }
+            current += timedelta(days=1)
+            continue
 
-        if is_reserved:
-            days[current.isoformat()] = {"status": "fully_reserved"}
-        else:
-            days[current.isoformat()] = {"status": "available"}
+        reserved = 0
+        for r in reservations:
+            if r["date_borrowed"] <= current <= r["date_return"]:
+                reserved += r["quantity"]
 
+        # Cap reserved and compute availability from total capacity
+        reserved = min(reserved, total_capacity)
+        available = max(total_capacity - reserved, 0)
+        status = "fully_reserved" if available == 0 else "available"
+
+        days[current.isoformat()] = {
+            "status": status,
+            "reserved_qty": reserved,
+            "available_qty": available,
+        }
         current += timedelta(days=1)
 
     return Response({
@@ -1446,6 +1556,17 @@ def item_availability_map(request, item_id):
         "item_name": item.name,
         "calendar": days
     }, status=200)
+
+    
+
+def get_total_capacity(item):
+    # quantities that were previously deducted from item.qty
+    active = (Reservation.objects
+              .filter(item=item, status__in=['pending', 'approved', 'in use'])
+              .aggregate(total=Sum('quantity'))['total'] or 0)
+    return (item.qty or 0) + active
+
+
 
 @csrf_exempt
 def verify_qr(request, mode, code):
@@ -1488,12 +1609,12 @@ def update_reservation(request, mode, code):
         # CLAIM MODE → borrower received the item
         if mode.lower() == "claim":
             reservation.status = "in use"
-            reservation.date_receive = timezone.now()  # ✅ record Date & Time Receive
+            reservation.date_receive = timezone.now()
 
             # Notify borrower
             Notification.objects.create(
                 user=reservation.userborrower,
-                title="Item Claimed Successfully ✅",
+                title="Item Claimed Successfully",
                 message=f"Your request for '{reservation.item.name}' has been successfully claimed and is now in use.",
                 type="claimed",
             )
@@ -1502,7 +1623,7 @@ def update_reservation(request, mode, code):
         # RETURN MODE (optional fallback)
         elif mode.lower() == "return":
             reservation.status = "returned"
-            reservation.date_returned = timezone.now()  # ✅ record Date & Time Returned
+            reservation.date_returned = timezone.now()
             message = f"{reservation.userborrower.full_name} has returned the item '{reservation.item.name}'."
 
         else:
@@ -1553,34 +1674,34 @@ def submit_feedback(request):
         # Update borrower status logic
         if return_status == "Late Return":
             borrower.late_count += 1
-            notif_title = "Late Return Notice ⚠️"
+            notif_title = "Late Return Notice"
             notif_message = f"You returned '{item.name}' late. Please avoid future delays."
             if borrower.late_count >= 3:
                 borrower.borrower_status = "Bad"
 
         elif return_status == "Not Returned":
             borrower.borrower_status = "Bad"
-            notif_title = "Item Not Returned ❌"
+            notif_title = "Item Not Returned"
             notif_message = f"Your borrowed item '{item.name}' was not returned. Please contact GSO immediately."
 
         else:
             borrower.borrower_status = "Good"
-            notif_title = "Returned On Time ✅"
+            notif_title = "Returned On Time"
             notif_message = f"Thank you for returning '{item.name}' on time! Keep it up."
 
         borrower.save()
 
-        # ✅ Update reservation + record actual return time
+        # Update reservation + record actual return time
         reservation.status = "returned"
-        reservation.date_returned = timezone.now()  # ✅ Save Date & Time Returned
+        reservation.date_returned = timezone.now() 
         reservation.save()
 
-        # ✅ Restore inventory
+        # Restore inventory
         item.qty += reservation.quantity
         item.status = "Available"
         item.save()
 
-        # ✅ Notify borrower in mobile app
+        # Notify borrower in mobile app
         Notification.objects.create(
             user=borrower,
             title=notif_title,
@@ -1618,12 +1739,15 @@ def damage_report_list(request):
 
     report_data = []
     for r in reports:
+        # convert UTC → local timezone
+        local_time = timezone.localtime(r.date_reported)
+
         report_data.append({
             'user_id': r.reported_by.id,
             'user_name': r.reported_by.full_name,
             'address': r.reported_by.address,
             'image': r.image.url if r.image else 'No image',
-            'date': r.date_reported.strftime("%Y-%m-%d %H:%M"),
+            'date': local_time.strftime("%Y-%m-%d %I:%M %p"), 
             'description': r.description,
             'quantity': r.quantity_affected,
             'location': r.location,
@@ -1665,7 +1789,7 @@ def submit_damage_report(request):
 def get_item_calendar(request, item_id):
     """
     Return all reservations and blocked dates for the given item.
-    Used by both web dashboard and mobile app.
+    Includes reservation info grouped by date for frontend table rendering.
     """
     try:
         item = Item.objects.get(item_id=item_id)
@@ -1673,8 +1797,29 @@ def get_item_calendar(request, item_id):
         return Response({"error": "Item not found"}, status=404)
 
     # Fetch reservations
-    reservations = Reservation.objects.filter(item=item)
+    reservations = Reservation.objects.filter(
+        item=item
+    ).exclude(status__in=["cancelled", "rejected"])
     blocked = BlockedDate.objects.filter(item=item)
+
+    # Group reservations by specific date
+    reservations_by_date = {}
+    for r in reservations:
+        if not r.date_borrowed or not r.date_return:
+            continue
+        current = r.date_borrowed
+        while current <= r.date_return:
+            key = current.strftime("%Y-%m-%d")
+            if key not in reservations_by_date:
+                reservations_by_date[key] = []
+            reservations_by_date[key].append({
+                "name": r.userborrower.full_name if r.userborrower else "Unknown",
+                "date_borrowed": r.date_borrowed.strftime("%Y-%m-%d"),
+                "date_return": r.date_return.strftime("%Y-%m-%d"),
+                "quantity": r.quantity,
+                "status": r.status.capitalize(),
+            })
+            current += timedelta(days=1)
 
     data = {
         "reservations": [
@@ -1686,11 +1831,13 @@ def get_item_calendar(request, item_id):
             for r in reservations
         ],
         "blocked": [b.date.strftime("%Y-%m-%d") for b in blocked],
+        "reservations_by_date": reservations_by_date,
     }
     return Response(data, status=200)
 
 
-# ✅ Unified block/unblock (for admin dashboard)
+
+# Unified block/unblock (for admin dashboard)
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -1729,16 +1876,110 @@ def toggle_block_date(request, item_id):
         return Response({"error": str(e)}, status=500)
     
     
+
+
+#  Cancel Reservation, qty increase and Notification
 @api_view(["POST"])
 def cancel_reservations_for_date(request, item_id):
+    """
+    Cancels all active reservations for a given date and item.
+    Restores reserved quantities to the item stock.
+    Sends notifications to affected borrowers.
+    """
     try:
         date_str = request.data.get("date")
         if not date_str:
             return Response({"error": "Missing date"}, status=400)
 
-        item = Item.objects.get(item_id=item_id)
-        count = Reservation.objects.filter(item=item, date_borrowed=date_str).exclude(status="cancelled").update(status="cancelled")
+        date = parse_date(date_str)
+        if not date:
+            return Response({"error": "Invalid date format"}, status=400)
 
-        return Response({"message": f"{count} reservation(s) cancelled for {date_str}."})
+        # Get the item
+        item = Item.objects.get(item_id=item_id)
+
+        # Find reservations overlapping the selected date
+        reservations = Reservation.objects.filter(
+            item=item,
+            date_borrowed__lte=date,
+            date_return__gte=date
+        ).exclude(status="cancelled")
+
+        if not reservations.exists():
+            return Response({"message": "No active reservations found for this date."}, status=200)
+
+        total_restored = 0
+        cancelled_count = 0
+
+        for r in reservations:
+            borrower = r.userborrower
+            total_restored += r.quantity or 0
+            r.status = "cancelled"
+            r.save(update_fields=["status"])
+            cancelled_count += 1
+
+            #  Send a notification to each affected borrower
+            if borrower:
+                create_notification(
+                    borrower,
+                    title="Reservation Cancelled by Admin ",
+                    message=f"Your reservation for {r.item.name} on {r.date_borrowed.strftime('%Y-%m-%d')} has been cancelled by the admin.",
+                    notif_type="cancelled",
+                    reservation=r
+                )
+
+        # ✅ Update item qty
+        if total_restored > 0:
+            item.qty = item.qty + total_restored
+            item.save(update_fields=["qty"])
+
+        return Response({
+            "message": f"{cancelled_count} reservation(s) cancelled for {date_str}.",
+            "restored_qty": total_restored,
+            "new_item_qty": item.qty
+        }, status=200)
+
+    except Item.DoesNotExist:
+        return Response({"error": "Item not found"}, status=404)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return Response({"error": str(e)}, status=500)
+
+    
+    
+@login_required
+def change_password(request):
+    if request.method == 'POST':
+        current_password = request.POST.get('current_password')
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
+
+        user = request.user
+
+        # Validate current password
+        if not check_password(current_password, user.password):
+            messages.error(request, "Current password is incorrect.")
+            return redirect('change_password')
+
+        # Validate new passwords match
+        if new_password != confirm_password:
+            messages.error(request, "New passwords do not match.")
+            return redirect('change_password')
+
+        # Validate password length (optional)
+        if len(new_password) < 8:
+            messages.error(request, "New password must be at least 8 characters long.")
+            return redirect('change_password')
+
+        # Save new password
+        user.set_password(new_password)
+        user.save()
+
+        # Keep user logged in after password change
+        update_session_auth_hash(request, user)
+
+        messages.success(request, "Password updated successfully!")
+        return redirect('change_password')
+
+    return render(request, 'change_password.html')

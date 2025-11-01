@@ -29,15 +29,15 @@ urlpatterns = [
 
     path("verification/", views.verification, name="verification"),
     path("transaction_history/", views.transaction_log, name="transaction_log"),
-    path("damage/", views.damage_report, name="damage_report"),
     path("statistics/", views.statistics, name="statistics"),
-    path("change-password/", views.change_pass, name="change_pass"),
+    path('change_password/', views.change_password, name='change_password'),
     path("list_of_users/", views.list_of_users, name="list_of_users"),
     path("logout/", views.logout, name="logout"),
 
     # API endpoints
-    path("token/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+
 
     path("api/register/", views.api_register),
     path("api/login/", views.api_login),
@@ -71,6 +71,9 @@ urlpatterns = [
 
     path('damage_report/', views.damage_report_list, name='damage_report_list'),
     path('api/damage-report/', views.submit_damage_report, name='submit_damage_report'),
+    path('api/item/<int:item_id>/calendar/', views.get_item_calendar, name='get_item_calendar'),
+    path('api/item/<int:item_id>/block-toggle/', views.toggle_block_date, name='toggle_block_date'),
+    path("api/item/<int:item_id>/cancel-reservations/", views.cancel_reservations_for_date),
 
     path("statistics/data/", views.statistics_data, name="statistics_data"),
     path("statistics/export/excel/", views.export_excel, name="export_excel"),

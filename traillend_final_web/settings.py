@@ -40,7 +40,7 @@ SECRET_KEY = 'django-insecure-g%ec9@2x9!z^j=w$ssd4+n_3+o!hwg1op&-9^4@yo$s#i1)5n6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['10.178.38.115', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['10.178.38.115', 'localhost', '127.0.0.1', '192.168.1.8']
 
 
 
@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'core',
     'corsheaders',
     'django_crontab',
+    'rest_framework_simplejwt.token_blacklist',
 ]
 
 MIDDLEWARE = [
@@ -81,9 +82,9 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),   # short, safe
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),   # short, safe
     # Make refresh extremely long (e.g., 10 years). Adjust to your policy.
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=3650),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=31),
 
     # Sliding behavior: each refresh issues a NEW refresh token with a fresh lifetime.
     "ROTATE_REFRESH_TOKENS": True,
@@ -122,12 +123,12 @@ WSGI_APPLICATION = 'traillend_final_web.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'traillend_dbmain',
-        'USER': 'capstone',
-        'PASSWORD': 'okipuhaha',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'traillend_db3',       # your database name
+        'USER': 'root',            # default XAMPP user
+        'PASSWORD': '',            # default XAMPP password is empty
+        'HOST': '127.0.0.1',       # localhost
+        'PORT': '3306',            # default MySQL port
     }
 }
 
@@ -157,7 +158,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Manila'
 
 USE_I18N = True
 
@@ -190,3 +191,5 @@ EMAIL_HOST_PASSWORD = 'vityemepzgqcdamk'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = '/login/'
