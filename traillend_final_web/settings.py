@@ -40,7 +40,7 @@ SECRET_KEY = 'django-insecure-g%ec9@2x9!z^j=w$ssd4+n_3+o!hwg1op&-9^4@yo$s#i1)5n6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['10.178.38.115', 'localhost', '127.0.0.1', '192.168.1.8']
+ALLOWED_HOSTS = ['10.178.38.115', 'localhost', '127.0.0.1', '192.168.1.8', '172.22.140.112', '10.180.1.217','192.168.43.118']
 
 
 
@@ -185,6 +185,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587 
+EMAIL_TIMEOUT = 10
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'traillendsystem@gmail.com'
 EMAIL_HOST_PASSWORD = 'vityemepzgqcdamk'

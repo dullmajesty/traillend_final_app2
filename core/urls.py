@@ -15,7 +15,7 @@ urlpatterns = [
     # Admin web views
     path("dashboard/", views.dashboard, name="dashboard"),
     
-    # ✅ Forgot password + reset code
+    # Forgot password + reset code
     path("forgot_password/", views.forgot_password, name="forgot_password"),
     path("verify_reset_code/", views.verify_reset_code, name="verify_reset_code"),
 
@@ -40,6 +40,7 @@ urlpatterns = [
 
 
     path("api/register/", views.api_register),
+    path("api/api/verify_email", views.verify_email),
     path("api/login/", views.api_login),
     path("api/inventory_list/", views.api_inventory_list),
     path("api/inventory_detail/<int:id>/", views.api_inventory_detail),
@@ -57,6 +58,11 @@ urlpatterns = [
     path('api/save_token/', views.save_device_token, name='save_device_token'),
     path('api/notifications/', views.get_user_notifications, name='get_user_notifications'),
     path('api/notifications/<int:pk>/read/', views.mark_notification_as_read, name='mark_notification_as_read'),
+    path('api/notifications/mark_all_read/', views.mark_all_notifications_as_read, name='mark_all_notifications_as_read'),
+    path('api/notifications/add-delayed/', views.add_delayed_notification, name='add_delayed_notification'),
+    path('api/notifications/delete/<int:pk>/', views.delete_notification, name='delete_notification'),
+    path('api/notifications/trigger_due_reminders/', views.trigger_due_soon_notifications),
+
     #NEW
     path('api/user_reservations/', views.user_reservations, name='user_reservations'),
     path('api/reservations/<int:pk>/cancel/', views.cancel_reservation, name='cancel_reservation'),
@@ -78,6 +84,10 @@ urlpatterns = [
     path("statistics/data/", views.statistics_data, name="statistics_data"),
     path("statistics/export/excel/", views.export_excel, name="export_excel"),
     path("statistics/export/pdf/", views.export_pdf, name="export_pdf"),
+    
+    #  Forgot password + reset code
+    path('forgot-password/', views.forgot_password, name='forgot_password'),
+    path('verify-reset-code/', views.verify_reset_code, name='verify_reset_code')
 
 ]
 

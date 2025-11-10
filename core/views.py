@@ -64,12 +64,20 @@ from django.shortcuts import render, redirect
 from django.conf import settings
 import random
 
+#SIGN UP
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.conf import settings
 
 #logout
 from django.shortcuts import redirect
 from django.contrib.auth import logout as auth_logout
 
 from .models import Notification, DeviceToken
+from django.core.mail import EmailMultiAlternatives
+from django.utils.html import strip_tags
 
 
 
@@ -677,11 +685,10 @@ def logout(request):
 # -----------------------
 # API views (JSON)
 # -----------------------
-
 @csrf_exempt
 def api_register(request):
     """
-    API endpoint for mobile users to register
+    API endpoint for registration with HTML email and local dev IP support.
     """
     if request.method == "POST":
         try:
@@ -692,26 +699,35 @@ def api_register(request):
             full_name = data.get("name")
             contact_number = data.get("contactNumber")
             address = data.get("address")
+            email = data.get("email")
 
-            if not username or not password or not confirm_password or not full_name:
+
+            # Validation
+            if not all([username, password, confirm_password, full_name, email]):
                 return JsonResponse({"success": False, "message": "Missing required fields"}, status=400)
 
-            # Check if username exists
+
             if User.objects.filter(username=username).exists():
                 return JsonResponse({"success": False, "message": "Username already exists"}, status=400)
+
+
+            if User.objects.filter(email=email).exists():
+                return JsonResponse({"success": False, "message": "Email already registered"}, status=400)
+
 
             if password != confirm_password:
                 return JsonResponse({"success": False, "message": "Passwords do not match"}, status=400)
 
-            # Create User
+
+            # Create inactive user
             user = User.objects.create_user(
                 username=username,
                 password=password,
-                is_staff=False,
-                is_active=True
+                email=email,
+                is_active=False
             )
 
-            # Create UserProfile
+
             UserBorrower.objects.create(
                 user=user,
                 full_name=full_name,
@@ -719,12 +735,173 @@ def api_register(request):
                 address=address
             )
 
-            return JsonResponse({"success": True, "message": "User registered successfully"}, status=201)
+
+            # Generate verification link (use your local IP for now)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+
+
+            # 🧩 Local development link — works, but user won't see the IP
+            verify_url = f"http://10.28.152.115:8000/api/verify-email/{uid}/{token}/"
+
+
+            # HTML Email Template
+            html_message = f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Verify Your Email - TrailLend</title>
+            </head>
+            <body style="font-family:'Poppins',Arial,sans-serif; background-color:#f4f6f9; padding:30px;">
+              <table align="center" style="max-width:600px; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+                <tr>
+                  <td style="background-color:#1976D2; text-align:center; padding:30px;">
+                    <img src="https://i.postimg.cc/pTymgvs2/TRAILLEND-ICON.png" alt="TrailLend Logo" width="80" />
+                    <h1 style="color:#fff; margin:10px 0 0;">TrailLend</h1>
+                    <p style="color:#cce6ff;">Empowering the Community Together 🌿</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:30px;">
+                    <h2 style="color:#1976D2;">Email Verification Required</h2>
+                    <p style="color:#333;">Hi {full_name},</p>
+                    <p style="color:#555;">Thank you for registering on <strong>TrailLend</strong>!
+                    To activate your account, please verify your email address by clicking the button below:</p>
+
+
+                    <div style="text-align:center; margin:30px 0;">
+                      <a href="{verify_url}"
+                         style="background-color:#1976D2; color:#fff; text-decoration:none;
+                                padding:14px 28px; border-radius:8px; font-weight:bold; display:inline-block;">
+                        Verify My Email
+                      </a>
+                    </div>
+
+
+                    <p style="color:#777; font-size:14px;">If you didn’t create this account, please ignore this email.</p>
+                    <hr style="border:none; border-top:1px solid #eee; margin:30px 0;">
+                    <p style="color:#999; font-size:12px; text-align:center;">
+                      © 2025 TrailLend • Barangay General Services Office<br>
+                      Please do not reply directly to this message.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """
+
+
+            send_mail(
+                subject="Verify Your TrailLend Account",
+                message="Please verify your TrailLend account.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+                html_message=html_message
+            )
+
+
+            return JsonResponse({
+                "success": True,
+                "message": "Registration successful! Check your email to verify your account."
+            }, status=201)
+
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return JsonResponse({"success": False, "message": str(e)}, status=400)
 
+
     return JsonResponse({"success": False, "message": "Invalid request method"}, status=405)
+
+
+
+
+# Verify Email Endpoint
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def verify_email(request, uidb64, token):
+    """
+    Activates the user's account and hides IP on success.
+    """
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+
+
+        if default_token_generator.check_token(user, token):
+            user.is_active = True
+            user.save()
+
+
+            # Deep link to app
+            deep_link = "com.traillend.app://verified"
+
+
+            # Beautiful success page (no visible IP)
+            html = f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Email Verified - TrailLend</title>
+              <meta http-equiv="refresh" content="3;url={deep_link}">
+              <style>
+                body {{
+                    font-family: 'Poppins', Arial, sans-serif;
+                    background-color: #f4f6f9;
+                    text-align: center;
+                    padding: 60px;
+                }}
+                .card {{
+                    background: #fff;
+                    border-radius: 16px;
+                    max-width: 500px;
+                    margin: auto;
+                    padding: 40px;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                }}
+                .btn {{
+                    background-color: #1976D2;
+                    color: #fff;
+                    text-decoration: none;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    display: inline-block;
+                    margin-top: 20px;
+                    font-weight: bold;
+                }}
+                .btn:hover {{
+                    background-color: #145CA8;
+                }}
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <img src="https://i.postimg.cc/pTymgvs2/TRAILLEND-ICON.png" width="90" />
+                <h1 style="color:#1976D2;">Email Verified!</h1>
+                <p style="color:#333;">Your TrailLend account has been successfully verified.</p>
+                <p style="color:#555;">You can now log in to your account.</p>
+                <a href="{deep_link}" class="btn">Open TrailLend App</a>
+              </div>
+            </body>
+            </html>
+            """
+
+
+            return HttpResponse(html)
+
+
+        else:
+            return JsonResponse({"success": False, "message": "Invalid or expired verification link."}, status=400)
+    except Exception as e:
+        return JsonResponse({"success": False, "message": str(e)}, status=400)
+
 
 
 @csrf_exempt
@@ -1315,8 +1492,8 @@ def get_user_notifications(request):
                 "is_read": n.is_read,
                 "created_at": local_time.strftime("%Y-%m-%d %I:%M %p"),
                 "qr_code": request.build_absolute_uri(n.qr_code.url) if n.qr_code else None,
-                "transaction_id": transaction_id,     # ✅ Will now show properly
-                "item_name": item_name,               # ✅ Will now show properly
+                "transaction_id": transaction_id,     # Will now show properly
+                "item_name": item_name,               # Will now show properly
                 "quantity": getattr(reservation, "quantity", None),
                 "image_url": item_image_url,
             })
@@ -1333,7 +1510,7 @@ def create_notification(borrower, title, message, notif_type='general', qr_file=
     """Reusable helper to create both in-app + push notification."""
     notif = Notification.objects.create(
         user=borrower,
-        reservation=reservation,  # ✅ Link to reservation so app sees item details
+        reservation=reservation, 
         title=title,
         message=message,
         type=notif_type
@@ -1359,6 +1536,81 @@ def create_notification(borrower, title, message, notif_type='general', qr_file=
 
     return notif
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_delayed_notification(request):
+    """
+    Create a new 'delayed' notification for a borrower.
+    Expected JSON:
+    {
+        "user_id": 5,
+        "item_name": "Projector",
+        "message": "You returned the item late. Please be punctual next time."
+    }
+    """
+    try:
+        user_id = request.data.get("user_id")
+        message = request.data.get("message", "")
+        item_name = request.data.get("item_name", "")
+
+        if not user_id:
+            return Response({"success": False, "message": "Missing user_id"}, status=400)
+
+        borrower = UserBorrower.objects.get(id=user_id)
+
+        title = "Delayed Return Notice"
+        full_message = message or f"You returned '{item_name}' late. Please avoid future delays."
+
+        # Create the delayed notification
+        notif = Notification.objects.create(
+            user=borrower,
+            title=title,
+            message=full_message,
+            type="delayed",
+        )
+
+        # Optional: push notification
+        try:
+            token_entry = DeviceToken.objects.filter(user=borrower.user).last()
+            if token_entry:
+                push_message = messaging.Message(
+                    notification=messaging.Notification(
+                        title=title,
+                        body=full_message[:200],
+                    ),
+                    token=token_entry.token,
+                )
+                messaging.send(push_message)
+        except Exception as e:
+            print("Push notification failed:", e)
+
+        return Response({
+            "success": True,
+            "message": "Delayed notification sent successfully",
+            "notification_id": notif.id
+        }, status=201)
+
+    except UserBorrower.DoesNotExist:
+        return Response({"success": False, "message": "User not found"}, status=404)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return Response({"success": False, "message": str(e)}, status=500)
+
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_notification(request, pk):
+    """
+    Permanently deletes a single notification.
+    Only the owner of the notification can delete it.
+    """
+    try:
+        notif = Notification.objects.get(pk=pk, user__user=request.user)
+        notif.delete()
+        return Response({"success": True, "message": "Notification permanently deleted"}, status=200)
+    except Notification.DoesNotExist:
+        return Response({"success": False, "message": "Notification not found"}, status=404)
 
 
 
@@ -1375,8 +1627,63 @@ def mark_notification_as_read(request, pk):
         return Response({'success': True, 'message': 'Notification marked as read'})
     except Notification.DoesNotExist:
         return Response({'success': False, 'message': 'Notification not found'}, status=404)
-    
 
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def mark_all_notifications_as_read(request):
+    queryset = Notification.objects.filter(user__user=request.user, is_read=False)
+    count = queryset.update(is_read=True)
+    return Response({
+        'success': True,
+        'message': f'{count} notifications marked as read'
+    })   
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def trigger_due_soon_notifications(request):
+    send_due_soon_notifications()
+    return Response({'success': True, 'message': 'Return reminders sent successfully'})
+
+def send_due_soon_notifications():
+    """
+    Creates 'Return Reminder' notifications for items due tomorrow.
+    Can be called manually or via a scheduled task.
+    """
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+
+    due_soon = Reservation.objects.filter(
+        date_return=tomorrow,
+        status__in=['approved', 'in use']
+    ).select_related('userborrower', 'item')
+
+    for r in due_soon:
+        borrower = r.userborrower
+        item = r.item
+
+        if not borrower or not item:
+            continue
+
+        # Avoid duplicates
+        already_sent = Notification.objects.filter(
+            user=borrower,
+            reservation=r,
+            type='return_reminder'
+        ).exists()
+        if already_sent:
+            continue
+
+        Notification.objects.create(
+            user=borrower,
+            reservation=r,
+            title="Return Reminder",
+            message=f"Your borrowed item '{item.name}' is due for return tomorrow. Please return it on time to avoid penalties.",
+            type="return_reminder",
+        )
+        
+        
+        
+        
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_reservations(request):
@@ -1426,7 +1733,7 @@ def cancel_reservation(request, pk):
         # Create Cancellation Notification
         create_notification(
             borrower,
-            title="Reservation Cancelled ❌",
+            title="Reservation Cancelled",
             message=f"You cancelled your reservation for {reservation.item.name}.",
             notif_type="cancelled"
         )
@@ -1983,3 +2290,261 @@ def change_password(request):
         return redirect('change_password')
 
     return render(request, 'change_password.html')
+
+#NEW
+@csrf_exempt
+def forgot_password(request):
+    show_code_container = False
+    email_value = ""  # Store email to keep it in the input
+
+    if request.method == 'POST':
+        # === SEND RESET CODE ===
+        if 'send_code' in request.POST:
+            email = request.POST.get('email')
+            email_value = email
+
+            try:
+                user = User.objects.get(email=email)
+                code = random.randint(100000, 999999)
+                request.session['reset_email'] = email
+                request.session['reset_code'] = str(code)
+
+                # Build formal HTML email
+                subject = "🔐 TrailLend Password Reset Code"
+                from_email = settings.DEFAULT_FROM_EMAIL
+                to = [email]
+
+                html_content = f"""
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8" />
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                  <title>Password Reset - TrailLend</title>
+                </head>
+                <body style="margin:0; padding:0; background-color:#f4f6f9; font-family:'Poppins',Arial,sans-serif;">
+                  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" 
+                         style="max-width:600px; background-color:#ffffff; border-radius:10px; overflow:hidden; 
+                                box-shadow:0 4px 10px rgba(0,0,0,0.05); margin-top:40px;">
+                    <tr>
+                      <td style="background-color:#1976D2; text-align:center; padding:30px;">
+                        <img src="https://i.ibb.co/T2Hyfdd/TRAILLEND-ICON.png" alt="TrailLend Logo" width="80" style="margin-bottom:10px;" />
+                        <h1 style="color:#fff; font-size:22px; margin:0;">TrailLend</h1>
+                        <p style="color:#cce6ff; font-size:13px; margin:4px 0 0;">Empowering the Community Together 🌿</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:30px;">
+                        <h2 style="color:#1976D2; font-size:20px; margin-top:0;">Password Reset Request</h2>
+                        <p style="color:#333; font-size:15px;">Hello,</p>
+                        <p style="color:#333; font-size:15px;">We received a request to reset your TrailLend account password. 
+                        Please use the verification code below to continue:</p>
+
+                        <div style="text-align:center; margin:30px 0;">
+                          <span style="display:inline-block; background:#1976D2; color:#fff; font-size:28px; 
+                                       letter-spacing:5px; padding:15px 25px; border-radius:8px; font-weight:bold;">
+                            {code}
+                          </span>
+                        </div>
+
+                        <p style="color:#555; font-size:14px;">Enter this code in the TrailLend app to verify your identity. 
+                        This code will expire soon for security reasons.</p>
+
+                        <p style="color:#555; font-size:14px;">If you did not request a password reset, please ignore this email. 
+                        Your account remains secure.</p>
+
+                        <hr style="border:none; border-top:1px solid #eee; margin:30px 0;" />
+
+                        <p style="color:#999; font-size:12px; text-align:center;">
+                          This email was sent by <strong>TrailLend</strong> • Barangay General Services Office<br/>
+                          Please do not reply directly to this message.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """
+
+                text_content = strip_tags(html_content)
+
+                email_message = EmailMultiAlternatives(subject, text_content, from_email, to)
+                email_message.attach_alternative(html_content, "text/html")
+                email_message.send()
+
+                messages.success(request, "A reset code has been sent to your email. Please check your inbox.")
+                show_code_container = True
+
+            except User.DoesNotExist:
+                messages.error(request, "This email doesn't exist.")
+
+        # === VERIFY CODE ===
+        elif 'verify_code' in request.POST:
+            input_code = request.POST.get('reset_code')
+            session_code = request.session.get('reset_code')
+            email_value = request.session.get('reset_email', '')
+
+            if input_code == session_code:
+                messages.success(request, "Code verified successfully! You can now reset your password.")
+                return redirect('verify_reset_code')
+            else:
+                messages.error(request, "Invalid or incorrect code.")
+                show_code_container = True
+
+        # === RESEND CODE ===
+        elif 'resend_code' in request.POST:
+            email = request.session.get('reset_email')
+            email_value = email
+
+            if email:
+                code = random.randint(100000, 999999)
+                request.session['reset_code'] = str(code)
+
+                # Reuse same HTML layout for the resend email
+                subject = "🔐 TrailLend Password Reset Code (Resent)"
+                from_email = settings.DEFAULT_FROM_EMAIL
+                to = [email]
+
+                html_content = f"""
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8" /></head>
+                <body style="font-family:'Poppins',Arial,sans-serif; background-color:#f4f6f9; padding:30px;">
+                  <table align="center" style="max-width:600px; background:#fff; border-radius:10px; padding:30px;">
+                    <tr><td style="text-align:center;">
+                      <img src="https://i.ibb.co/T2Hyfdd/TRAILLEND-ICON.png" width="70" alt="TrailLend" />
+                      <h2 style="color:#1976D2;">TrailLend Password Reset (Resent)</h2>
+                      <p style="color:#333;">Here is your new reset code:</p>
+                      <div style="margin:20px 0;">
+                        <span style="display:inline-block; background:#1976D2; color:#fff; font-size:26px; 
+                                     letter-spacing:4px; padding:12px 22px; border-radius:8px; font-weight:bold;">
+                          {code}
+                        </span>
+                      </div>
+                      <p style="color:#555;">Enter this code in the TrailLend app to verify your identity.</p>
+                      <p style="color:#999; font-size:12px;">If you didn’t request this, you can safely ignore this email.</p>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """
+
+                text_content = strip_tags(html_content)
+
+                email_message = EmailMultiAlternatives(subject, text_content, from_email, to)
+                email_message.attach_alternative(html_content, "text/html")
+                email_message.send()
+
+                messages.success(request, "A new code has been sent to your email.")
+                show_code_container = True
+            else:
+                messages.error(request, "No email session found. Please enter your email again.")
+
+    # === RENDER TEMPLATE ===
+    return render(request, "forgot_password.html", {
+        'show_code_container': show_code_container,
+        'email': email_value or request.session.get('reset_email', '')
+    })
+
+
+@csrf_exempt
+def verify_reset_code(request):
+    """
+    Page for entering a new password after verifying the reset code.
+    """
+    email = request.session.get('reset_email')
+
+    if not email:
+        messages.error(request, "Session expired. Please enter your email again.")
+        return redirect('forgot_password')
+
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password')
+        confirm_password = request.POST.get('confirm_password')
+
+        if not new_password or not confirm_password:
+            messages.error(request, "Please fill in all fields.")
+        elif new_password != confirm_password:
+            messages.error(request, "Passwords do not match.")
+        else:
+            try:
+                user = User.objects.get(email=email)
+                user.set_password(new_password)
+                user.save()
+
+                # Clear session data
+                request.session.pop('reset_email', None)
+                request.session.pop('reset_code', None)
+
+                # === Send confirmation email ===
+                subject = "✅ Your TrailLend Password Has Been Changed"
+                from_email = settings.DEFAULT_FROM_EMAIL
+                to = [email]
+
+                html_content = f"""
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8" />
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                  <title>Password Changed - TrailLend</title>
+                </head>
+                <body style="margin:0; padding:0; background-color:#f4f6f9; font-family:'Poppins',Arial,sans-serif;">
+                  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" 
+                         style="max-width:600px; background-color:#ffffff; border-radius:10px; overflow:hidden; 
+                                box-shadow:0 4px 10px rgba(0,0,0,0.05); margin-top:40px;">
+                    <tr>
+                      <td style="background-color:#1976D2; text-align:center; padding:30px;">
+                        <img src="https://i.ibb.co/T2Hyfdd/TRAILLEND-ICON.png" alt="TrailLend Logo" width="80" style="margin-bottom:10px;" />
+                        <h1 style="color:#fff; font-size:22px; margin:0;">TrailLend</h1>
+                        <p style="color:#cce6ff; font-size:13px; margin:4px 0 0;">Empowering the Community Together 🌿</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:30px;">
+                        <h2 style="color:#1976D2; font-size:20px; margin-top:0;">Password Changed Successfully</h2>
+                        <p style="color:#333; font-size:15px;">Hello {user.first_name or user.username},</p>
+                        <p style="color:#333; font-size:15px;">
+                          This is a confirmation that your password for your TrailLend account 
+                          (<strong>{email}</strong>) has been successfully changed.
+                        </p>
+
+                        <p style="color:#555; font-size:14px; margin-top:20px;">
+                          If you did not make this change, please contact your Barangay General Services Office 
+                          immediately to secure your account.
+                        </p>
+
+                        <div style="text-align:center; margin:30px 0;">
+                          <a href="https://traillend.com/login" 
+                             style="display:inline-block; background:#1976D2; color:#fff; 
+                                    padding:12px 25px; border-radius:6px; font-weight:bold; text-decoration:none;">
+                            Go to TrailLend
+                          </a>
+                        </div>
+
+                        <hr style="border:none; border-top:1px solid #eee; margin:30px 0;" />
+
+                        <p style="color:#999; font-size:12px; text-align:center;">
+                          This email was sent by <strong>TrailLend</strong> • Barangay General Services Office<br/>
+                          Please do not reply directly to this message.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """
+
+                text_content = strip_tags(html_content)
+                email_message = EmailMultiAlternatives(subject, text_content, from_email, to)
+                email_message.attach_alternative(html_content, "text/html")
+                email_message.send()
+
+                # Show success message on UI
+                messages.success(request, "Your password has been successfully changed.")
+                return render(request, "verify_reset_code.html")
+
+            except User.DoesNotExist:
+                messages.error(request, "User not found. Please try again.")
+
+    return render(request, "verify_reset_code.html", {"email": email})

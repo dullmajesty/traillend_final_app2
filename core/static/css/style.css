@@ -174,10 +174,11 @@ body {
   overflow: auto;
   height: calc(100vh - 60px);
   position: relative;
-  opacity: 0;
+  opacity: 1;
   transform: translateY(4px);
   transition: opacity 0.22s ease, transform 0.22s ease;
   will-change: opacity, transform;
+  transform: none;
 }
 
 /* ✅ Dashboard only (with right panel) */
@@ -188,7 +189,6 @@ body.dashboard .content {
 /* ✅ All other pages full width */
 body:not(.dashboard) .content {
   margin-right: 0;
-  overflow-x: hidden;
 }
 
 
