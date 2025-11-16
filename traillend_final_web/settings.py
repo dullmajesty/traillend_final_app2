@@ -40,7 +40,7 @@ SECRET_KEY = 'django-insecure-g%ec9@2x9!z^j=w$ssd4+n_3+o!hwg1op&-9^4@yo$s#i1)5n6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['10.178.38.115', 'localhost', '127.0.0.1', '192.168.1.8', '172.22.140.112', '10.180.1.217','192.168.43.118']
+ALLOWED_HOSTS = ['10.92.122.115', 'localhost', '127.0.0.1', '192.168.1.8', '172.22.140.112', '10.180.1.217','192.168.43.118']
 
 
 
@@ -123,14 +123,15 @@ WSGI_APPLICATION = 'traillend_final_web.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'traillend_db3',       # your database name
-        'USER': 'root',            # default XAMPP user
-        'PASSWORD': '',            # default XAMPP password is empty
-        'HOST': '127.0.0.1',       # localhost
-        'PORT': '3306',            # default MySQL port
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'trllend_db',
+        'USER': 'capstone',
+        'PASSWORD': 'okipuhaha',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
+
 
 
 

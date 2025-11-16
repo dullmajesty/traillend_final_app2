@@ -40,7 +40,7 @@ urlpatterns = [
 
 
     path("api/register/", views.api_register),
-    path("api/api/verify_email", views.verify_email),
+    path("api/verify-email/<uidb64>/<token>/", views.verify_email, name="verify_email"),
     path("api/login/", views.api_login),
     path("api/inventory_list/", views.api_inventory_list),
     path("api/inventory_detail/<int:id>/", views.api_inventory_detail),
@@ -84,10 +84,11 @@ urlpatterns = [
     path("statistics/data/", views.statistics_data, name="statistics_data"),
     path("statistics/export/excel/", views.export_excel, name="export_excel"),
     path("statistics/export/pdf/", views.export_pdf, name="export_pdf"),
-    
-    #  Forgot password + reset code
-    path('forgot-password/', views.forgot_password, name='forgot_password'),
-    path('verify-reset-code/', views.verify_reset_code, name='verify_reset_code')
+
+    path("api/me_borrower/", views.me_borrower),
+    path("api/late-history/", views.borrower_late_history, name="borrower_late_history"),
+
+
 
 ]
 

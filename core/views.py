@@ -742,7 +742,7 @@ def api_register(request):
 
 
             # 🧩 Local development link — works, but user won't see the IP
-            verify_url = f"http://10.28.152.115:8000/api/verify-email/{uid}/{token}/"
+            verify_url = f"http://10.92.122.115:8000/api/verify-email/{uid}/{token}/"
 
 
             # HTML Email Template
@@ -907,7 +907,8 @@ def verify_email(request, uidb64, token):
 @csrf_exempt
 def api_login(request):
     """
-    API endpoint for mobile users to login and get JWT token
+    Mobile login API — allows restricted borrowers to login,
+    but returns their borrower_status so frontend can show modal.
     """
     if request.method == "POST":
         try:
@@ -916,24 +917,46 @@ def api_login(request):
             password = data.get("password")
 
             if not username or not password:
-                return JsonResponse({"success": False, "message": "Username and password required"}, status=400)
+                return JsonResponse({
+                    "success": False,
+                    "message": "Username and password required"
+                }, status=400)
 
             user = authenticate(request, username=username, password=password)
 
-            if user is not None:
-                refresh = RefreshToken.for_user(user)
+            if user is None:
                 return JsonResponse({
-                    "success": True,
-                    "message": "Login successful",
-                    "refresh": str(refresh),
-                    "access": str(refresh.access_token)
-                }, status=200)
-            else:
-                return JsonResponse({"success": False, "message": "Invalid credentials"}, status=401)
-        except Exception as e:
-            return JsonResponse({"success": False, "message": str(e)}, status=400)
+                    "success": False,
+                    "message": "Invalid credentials"
+                }, status=401)
 
-    return JsonResponse({"success": False, "message": "Invalid request method"}, status=405)
+            borrower = UserBorrower.objects.get(user=user)
+
+            # ⭐ ALLOW LOGIN FOR RESTRICTED ACCOUNTS
+            # DO NOT block login with 403
+            # Instead, return borrower_status to app
+            refresh = RefreshToken.for_user(user)
+
+            return JsonResponse({
+                "success": True,
+                "message": "Login successful",
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+                "borrower_status": borrower.borrower_status,   # ⭐ VERY IMPORTANT
+                "late_count": borrower.late_count              # ⭐ Add for UI if needed
+            }, status=200)
+
+        except Exception as e:
+            return JsonResponse({
+                "success": False,
+                "message": str(e)
+            }, status=400)
+
+    return JsonResponse({
+        "success": False,
+        "message": "Invalid request method"
+    }, status=405)
+
 
 
 @api_view(['GET'])
@@ -1867,11 +1890,7 @@ def item_availability_map(request, item_id):
     
 
 def get_total_capacity(item):
-    # quantities that were previously deducted from item.qty
-    active = (Reservation.objects
-              .filter(item=item, status__in=['pending', 'approved', 'in use'])
-              .aggregate(total=Sum('quantity'))['total'] or 0)
-    return (item.qty or 0) + active
+    return item.qty or 0
 
 
 
@@ -1892,6 +1911,7 @@ def verify_qr(request, mode, code):
             "item": reservation.item.name if reservation.item else "",
             "borrower": reservation.userborrower.full_name if reservation.userborrower else "",
             "status": reservation.status,
+            "quantity": reservation.quantity,
         }
         return JsonResponse(data)
     except Reservation.DoesNotExist:
@@ -1921,8 +1941,9 @@ def update_reservation(request, mode, code):
             # Notify borrower
             Notification.objects.create(
                 user=reservation.userborrower,
+                reservation=reservation,
                 title="Item Claimed Successfully",
-                message=f"Your request for '{reservation.item.name}' has been successfully claimed and is now in use.",
+                message=f"Your request for '{reservation.item.name}' has been successfully claimed.",
                 type="claimed",
             )
             message = f"{reservation.userborrower.full_name} has claimed the item '{reservation.item.name}'."
@@ -1949,7 +1970,6 @@ def update_reservation(request, mode, code):
 def submit_feedback(request):
     """
     Handles admin feedback submission after a borrower returns an item.
-    Updates borrower rating, feedback record, inventory, and records return date/time.
     """
     try:
         if request.method != "POST":
@@ -1974,33 +1994,60 @@ def submit_feedback(request):
             return_status=return_status,
         )
 
-        notif_message = ""
-        notif_title = ""
+        # Notification defaults
         notif_type = "returned"
 
-        # Update borrower status logic
         if return_status == "Late Return":
             borrower.late_count += 1
-            notif_title = "Late Return Notice"
-            notif_message = f"You returned '{item.name}' late. Please avoid future delays."
-            if borrower.late_count >= 3:
+
+            # ⚠️ EXACTLY 2 LATE RETURNS → WARNING NOTIFICATION
+            if borrower.late_count == 2:
+                notif_title = "⚠️ Warning: You now have 2 late returns"
+                notif_message = (
+                    "You now have 2 late return instances.\n"
+                    "Once you reach 3, you will be marked as a Bad Borrower and lose access to TrailLend."
+                )
+                notif_type = "warning"
+
+            # ⛔ 3 LATE RETURNS → BAD BORROWER
+            elif borrower.late_count >= 3:
                 borrower.borrower_status = "Bad"
+                notif_title = "⛔ Account Restricted: Bad Borrower Status"
+                notif_message = (
+                    "You now have 3 late returns.\n"
+                    "Your account is now restricted and you can no longer borrow items."
+                )
+                notif_type = "restricted"
+
+            # Otherwise just a normal late notification
+            else:
+                notif_title = "Late Return Notice"
+                notif_message = f"You returned '{item.name}' late."
+                notif_type = "returned"
+
 
         elif return_status == "Not Returned":
             borrower.borrower_status = "Bad"
-            notif_title = "Item Not Returned"
-            notif_message = f"Your borrowed item '{item.name}' was not returned. Please contact GSO immediately."
+            borrower.late_count = 3  # auto-max
+            notif_title = "⛔ Item Not Returned – Account Restricted"
+            notif_message = (
+                f"You did not return '{item.name}'. Your account is now restricted.\n"
+                "Please contact GSO immediately."
+            )
+            notif_type = "restricted"
 
         else:
-            borrower.borrower_status = "Good"
+            # Return on time NEVER decreases late count
             notif_title = "Returned On Time"
-            notif_message = f"Thank you for returning '{item.name}' on time! Keep it up."
+            notif_message = f"Thank you for returning '{item.name}' on time!"
+            notif_type = "returned"
+
 
         borrower.save()
 
-        # Update reservation + record actual return time
+        # Update reservation
         reservation.status = "returned"
-        reservation.date_returned = timezone.now() 
+        reservation.date_returned = timezone.now()
         reservation.save()
 
         # Restore inventory
@@ -2008,9 +2055,10 @@ def submit_feedback(request):
         item.status = "Available"
         item.save()
 
-        # Notify borrower in mobile app
+        # 🔥 Notification now includes the reservation FK
         Notification.objects.create(
             user=borrower,
+            reservation=reservation,
             title=notif_title,
             message=notif_message,
             type=notif_type,
@@ -2022,6 +2070,30 @@ def submit_feedback(request):
         return JsonResponse({"error": "Reservation not found"}, status=404)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+def list_notifications(request):
+    user = request.user
+
+    notifications = Notification.objects.filter(user=user).select_related("reservation__item")
+
+    notif_list = []
+    for n in notifications:
+        notif_list.append({
+            "id": n.id,
+            "title": n.title,
+            "message": n.message,
+            "type": n.type,
+            "is_read": n.is_read,
+            "created_at": n.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+
+            # 🔥 Reservation-based fields
+            "transaction_id": n.reservation.transaction_id if n.reservation else None,
+            "item_name": n.reservation.item.name if n.reservation else None,
+            "quantity": n.reservation.quantity if n.reservation else None,
+        })
+
+    return JsonResponse(notif_list, safe=False)
+
 
 @csrf_exempt
 def monthly_reset(request=None):
@@ -2548,3 +2620,61 @@ def verify_reset_code(request):
                 messages.error(request, "User not found. Please try again.")
 
     return render(request, "verify_reset_code.html", {"email": email})
+
+
+@csrf_exempt
+def me_borrower(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Unauthorized"}, status=401)
+
+    try:
+        borrower = UserBorrower.objects.get(user=request.user)
+        return JsonResponse({
+            "user_id": borrower.id,
+            "full_name": borrower.full_name,
+            "contact_number": borrower.contact_number,
+            "address": borrower.address,
+            "late_count": borrower.late_count,
+            "borrower_status": borrower.borrower_status,
+        })
+    except UserBorrower.DoesNotExist:
+        return JsonResponse({"error": "Borrower profile not found"}, status=404)
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def borrower_late_history(request):
+    user = request.user
+    try:
+        borrower = user.userborrower
+    except:
+        return JsonResponse({"error": "Borrower not found"}, status=404)
+
+    # Get all late returns
+    late_feedback = Feedback.objects.filter(
+        userborrower=borrower,
+        return_status="Late"
+    ).select_related("reservation__item")
+
+    history = []
+    for fb in late_feedback:
+        reservation = fb.reservation
+        item = reservation.item if reservation else None
+
+        history.append({
+            "reservation_id": reservation.id if reservation else None,
+            "item_name": item.name if item else "Unknown Item",
+            "date_borrowed": str(reservation.date_borrowed) if reservation else None,
+            "date_return": str(reservation.date_return) if reservation else None,
+            "feedback_date": fb.created_at.strftime("%Y-%m-%d %H:%M"),
+        })
+
+    data = {
+        "full_name": borrower.full_name,
+        "late_count": borrower.late_count,
+        "borrower_status": borrower.borrower_status,
+        "late_history": history,
+    }
+
+    return JsonResponse(data, safe=False)
+
+
