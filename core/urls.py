@@ -88,6 +88,11 @@ urlpatterns = [
     path("api/me_borrower/", views.me_borrower),
     path("api/late-history/", views.borrower_late_history, name="borrower_late_history"),
 
+    path("api/item/<int:item_id>/admin-borrow/", views.create_admin_borrow, name="create_admin_borrow"),
+    path("api/admin-borrow/<int:pk>/update/", views.update_admin_borrow, name="update_admin_borrow"),
+    path("api/admin-borrow/<int:pk>/delete/", views.delete_admin_borrow, name="delete_admin_borrow"),
+
+
 
 
 ]

@@ -134,3 +134,16 @@ class BlockedDate(models.Model):
 
     def str(self):
         return f"{self.item.name} - {self.date}"
+
+class AdminBorrow(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name="admin_borrows")
+    date = models.DateField()  # FIXED start date (selected date)
+    return_date = models.DateField()  # admin-chosen return date
+    quantity = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.item.name} - {self.quantity} pcs ({self.date} → {self.return_date})"

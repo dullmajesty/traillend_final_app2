@@ -5,6 +5,7 @@
 <section class="item-detail-page">
   <!-- 🔹 TOP ROW: ITEM DETAILS + CALENDAR -->
   <div class="item-calendar-row">
+
     <!-- ITEM DETAILS CARD -->
     <div class="item-card">
       <div class="item-header">
@@ -66,12 +67,41 @@
   </div>
 </section>
 
-<!-- ✅ FULLCALENDAR -->
+<!-- 🔹 ADMIN BORROW MODAL -->
+<div id="adminBorrowModal" class="modal-overlay">
+  <div class="modal-content">
+    <h2 class="modal-title">Adjust Quantity for <span id="modalDateDisplay"></span></h2>
+
+    <div class="modal-section">
+      <p><strong>Total Quantity:</strong> <span id="modalTotalQty"></span></p>
+      <p><strong>Reserved:</strong> <span id="modalReservedQty"></span></p>
+      <p><strong>Admin Borrowed:</strong> <span id="modalAdminBorrowed"></span></p>
+      <p><strong>Available:</strong> <span id="modalAvailableQty" class="available-highlight"></span></p>
+    </div>
+
+    <div class="modal-section">
+      <label><strong>Borrow Quantity:</strong></label>
+      <input type="number" id="adminBorrowQty" min="1" class="modal-input" placeholder="Enter borrowed qty">
+
+      <label><strong>Return Date:</strong></label>
+      <input type="date" id="adminReturnDate" class="modal-input">
+    </div>
+
+    <div class="modal-buttons">
+      <button class="btn-primary" id="saveAdminBorrowBtn">Save</button>
+      <button class="btn-warning" id="closeModalBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- FULLCALENDAR -->
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 
-<!-- ✅ STYLES -->
 <style>
+/* ---------------------------------------------------------
+   YOUR ORIGINAL STYLES (unchanged)
+---------------------------------------------------------- */
 body {
   background: #f5f7fb;
   font-family: "Inter", sans-serif;
@@ -150,7 +180,6 @@ body {
   height: 350px;
 }
 
-/* TABLE SECTION */
 .reservation-section {
   background: #fff;
   border-radius: 12px;
@@ -211,7 +240,72 @@ body {
   cursor: pointer;
 }
 
-/* TOAST */
+/* ---------------------------------------------------------
+   🔹 MODAL STYLING
+---------------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 5000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 14px;
+  padding: 25px;
+  width: 420px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  animation: fadeIn 0.25s ease;
+}
+
+.modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin-bottom: 10px;
+}
+
+@keyframes fadeIn {
+  from { opacity:0; transform: scale(0.95); }
+  to { opacity:1; transform: scale(1); }
+}
+
+.modal-section {
+  margin: 12px 0;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 5px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+}
+
+.modal-buttons {
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.available-highlight {
+  font-weight: 700;
+  color: #2563eb;
+}
+
+/* ---------------------------------------------------------
+   🔹 TOAST
+---------------------------------------------------------- */
 .toast {
   position: fixed;
   bottom: 20px;
@@ -235,21 +329,37 @@ body {
 }
 </style>
 
-<!-- ✅ SCRIPT -->
+<!-- ---------------------------------------------------------
+     PART 3 — JAVASCRIPT
+---------------------------------------------------------- -->
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
-  const itemId = {{ item.item_id }};
+  const itemId = "{{ item.item_id }}";
   const calendarEl = document.getElementById("itemCalendar");
   const reservationBody = document.getElementById("reservationBody");
   const selectedDateTitle = document.getElementById("selectedDateTitle");
   const cancelAllBtn = document.getElementById("cancelAllBtn");
   const blockBtn = document.getElementById("blockBtn");
 
-  let allReservations = [];
-  let blockedDates = new Set();
+  /* 🔹 MODAL ELEMENTS */
+  const modal = document.getElementById("adminBorrowModal");
+  const modalDateDisplay = document.getElementById("modalDateDisplay");
+  const modalTotalQty = document.getElementById("modalTotalQty");
+  const modalReservedQty = document.getElementById("modalReservedQty");
+  const modalAdminBorrowed = document.getElementById("modalAdminBorrowed");
+  const modalAvailableQty = document.getElementById("modalAvailableQty");
+  const adminBorrowQtyInput = document.getElementById("adminBorrowQty");
+  const adminReturnDateInput = document.getElementById("adminReturnDate");
+  const saveAdminBorrowBtn = document.getElementById("saveAdminBorrowBtn");
+  const closeModalBtn = document.getElementById("closeModalBtn");
+
   let selectedDate = null;
   let calendarData = {};
+  let calendar = null;
 
+  /* --------------------------------------------------------
+     🔹 TOAST FUNCTION
+  ---------------------------------------------------------- */
   function showToast(message, type="info") {
     const toast = document.createElement("div");
     toast.className = `toast ${type}`;
@@ -259,14 +369,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 300); }, 3000);
   }
 
+  /* --------------------------------------------------------
+     🔹 FETCH CALENDAR DATA
+  ---------------------------------------------------------- */
   async function fetchCalendarData() {
     const res = await fetch(`/api/item/${itemId}/calendar/`);
-    const data = await res.json();
-    allReservations = data.reservations || [];
-    blockedDates = new Set(data.blocked || []);
-    return data;
+    return await res.json();
   }
 
+  /* --------------------------------------------------------
+     🔹 RENDER LOWER TABLE
+  ---------------------------------------------------------- */
   function renderTable(dateStr) {
     selectedDate = dateStr;
     selectedDateTitle.textContent = `Reservations for ${dateStr}`;
@@ -294,9 +407,100 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  /* --------------------------------------------------------
+     🔹 OPEN MODAL
+  ---------------------------------------------------------- */
+  function openAdminBorrowModal(dateStr) {
+    selectedDate = dateStr;
+    modalDateDisplay.textContent = dateStr;
 
+    const total = Number("{{ item.qty }}");
+    const reservationsByDate = calendarData.reservations_by_date || {};
+    const adminBorrowByDate = calendarData.admin_borrow || {};
+
+    const reserved = reservationsByDate[dateStr]
+      ? reservationsByDate[dateStr].reduce((sum, r) => sum + r.quantity, 0)
+      : 0;
+
+    const adminBorrowed = adminBorrowByDate[dateStr]
+      ? adminBorrowByDate[dateStr].reduce((sum, x) => sum + x.quantity, 0)
+      : 0;
+
+    const available = total - reserved - adminBorrowed;
+
+    modalTotalQty.textContent = total;
+    modalReservedQty.textContent = reserved;
+    modalAdminBorrowed.textContent = adminBorrowed;
+    modalAvailableQty.textContent = available;
+
+    adminBorrowQtyInput.value = "";
+    adminReturnDateInput.value = "";
+
+    modal.style.display = "flex";
+  }
+
+  /* --------------------------------------------------------
+     🔹 CLOSE MODAL
+  ---------------------------------------------------------- */
+  function closeModal() {
+    modal.style.display = "none";
+  }
+  closeModalBtn.addEventListener("click", closeModal);
+  window.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  /* --------------------------------------------------------
+     🔹 SAVE ADMIN BORROW
+  ---------------------------------------------------------- */
+  saveAdminBorrowBtn.addEventListener("click", async () => {
+    if (!selectedDate) return;
+
+    const qty = adminBorrowQtyInput.value;
+    const returnDate = adminReturnDateInput.value;
+
+    if (!qty || qty < 1) {
+      showToast("Enter a valid borrow quantity", "error");
+      return;
+    }
+
+    if (!returnDate) {
+      showToast("Select a return date", "error");
+      return;
+    }
+
+    const payload = {
+      start_date: selectedDate,
+      return_date: returnDate,
+      quantity: qty
+    };
+
+    const res = await fetch(`/api/item/${itemId}/admin-borrow/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast(data.error || "Failed to save", "error");
+      return;
+    }
+
+    showToast("Admin borrow saved!", "success");
+    closeModal();
+
+    await initCalendar();
+    renderTable(selectedDate);
+  });
+
+  /* --------------------------------------------------------
+     🔹 INITIALIZE CALENDAR
+  ---------------------------------------------------------- */
   async function initCalendar() {
     calendarData = await fetchCalendarData();
+
     const events = [
       ...calendarData.reservations.map(r => ({
         title: r.name,
@@ -307,8 +511,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         title: "Blocked",
         start: date,
         color: "#9ca3af",
-      }))
+      })),
+      ...Object.entries(calendarData.admin_borrow || {}).flatMap(([date, entries]) =>
+        entries.map(e => ({
+          title: `Admin Borrow (${e.quantity})`,
+          start: date,
+          color: "#2563eb",
+        }))
+      )
     ];
+
+    if (calendar) calendar.destroy();
 
     calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: "dayGridMonth",
@@ -316,14 +529,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       headerToolbar: { left: "prev,next", center: "title", right: "" },
       events,
       dateClick: (info) => {
-        selectedDate = info.dateStr;
-        renderTable(selectedDate);
+        openAdminBorrowModal(info.dateStr);
+        renderTable(info.dateStr);
       },
     });
 
     calendar.render();
   }
 
+  /* --------------------------------------------------------
+     🔹 CANCEL ALL RESERVATIONS
+  ---------------------------------------------------------- */
   cancelAllBtn.addEventListener("click", async () => {
     if (!selectedDate) return;
     if (!confirm(`Cancel all reservations for ${selectedDate}?`)) return;
@@ -340,6 +556,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderTable(selectedDate);
   });
 
+  /* --------------------------------------------------------
+     🔹 BLOCK / UNBLOCK DATE
+  ---------------------------------------------------------- */
   blockBtn.addEventListener("click", async () => {
     if (!selectedDate) return;
     const res = await fetch(`/api/item/${itemId}/block-toggle/`, {
@@ -353,7 +572,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderTable(selectedDate);
   });
 
+  /* --------------------------------------------------------
+     🔹 INITIALIZE EVERYTHING
+  ---------------------------------------------------------- */
   initCalendar();
 });
 </script>
+
 {% endblock %}

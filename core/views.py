@@ -56,6 +56,8 @@ import pandas as pd
 from django.template.loader import render_to_string
 from xhtml2pdf import pisa
 
+from .models import AdminBorrow
+
 
 #FORGOT PASSWORD
 from django.core.mail import send_mail
@@ -1843,42 +1845,77 @@ def item_availability_map(request, item_id):
         ).values("date_borrowed", "date_return", "quantity")
     )
 
+    admin_borrows = list(
+        AdminBorrow.objects.filter(item=item).values("date", "return_date", "quantity")
+    )
+
     blocked_dates = set(
         b.date if isinstance(b.date, date) else b.date.date()
         for b in BlockedDate.objects.filter(item=item)
     )
-
 
     start = date.today()
     end = start + timedelta(days=60)
 
     days = {}
     current = start
+
     while current <= end:
+
+        # BLOCKED DATE
         if current in blocked_dates:
             days[current.isoformat()] = {
                 "status": "blocked",
                 "reserved_qty": 0,
+                "admin_borrowed": 0,
                 "available_qty": 0,
             }
             current += timedelta(days=1)
             continue
 
+        # RESERVATIONS
         reserved = 0
         for r in reservations:
-            if r["date_borrowed"] <= current <= r["date_return"]:
+            start = r["date_borrowed"]
+            end = r["date_return"]
+
+            if isinstance(start, str):
+                start = date.fromisoformat(start)
+            if isinstance(end, str):
+                end = date.fromisoformat(end)
+
+            if start <= current <= end:
                 reserved += r["quantity"]
 
-        # Cap reserved and compute availability from total capacity
+        # ADMIN BORROWS
+        admin_used = 0
+        for a in admin_borrows:
+            start = a["date"]
+            end = a["return_date"]
+
+            if isinstance(start, str):
+                start = date.fromisoformat(start)
+            if isinstance(end, str):
+                end = date.fromisoformat(end)
+
+            if start <= current <= end:
+                admin_used += a["quantity"]
+
+        # CAP AND COMPUTE
         reserved = min(reserved, total_capacity)
-        available = max(total_capacity - reserved, 0)
+        admin_used = min(admin_used, total_capacity)
+
+        available = max(total_capacity - reserved - admin_used, 0)
+
         status = "fully_reserved" if available == 0 else "available"
 
         days[current.isoformat()] = {
             "status": status,
             "reserved_qty": reserved,
+            "admin_borrowed": admin_used,
             "available_qty": available,
         }
+
         current += timedelta(days=1)
 
     return Response({
@@ -1887,7 +1924,8 @@ def item_availability_map(request, item_id):
         "calendar": days
     }, status=200)
 
-    
+
+
 
 def get_total_capacity(item):
     return item.qty or 0
@@ -2167,8 +2205,8 @@ def submit_damage_report(request):
 @permission_classes([AllowAny])
 def get_item_calendar(request, item_id):
     """
-    Return all reservations and blocked dates for the given item.
-    Includes reservation info grouped by date for frontend table rendering.
+    Return all reservations, blocked dates, and admin borrow data for the given item.
+    Includes reservation info grouped by date for frontend rendering.
     """
     try:
         item = Item.objects.get(item_id=item_id)
@@ -2179,18 +2217,26 @@ def get_item_calendar(request, item_id):
     reservations = Reservation.objects.filter(
         item=item
     ).exclude(status__in=["cancelled", "rejected"])
+
+    # Fetch blocked dates
     blocked = BlockedDate.objects.filter(item=item)
 
-    # Group reservations by specific date
+    # Fetch admin borrows
+    admin_borrows = AdminBorrow.objects.filter(item=item)
+
+    # --- GROUP RESERVATIONS BY DATE ---
     reservations_by_date = {}
     for r in reservations:
         if not r.date_borrowed or not r.date_return:
             continue
+
         current = r.date_borrowed
         while current <= r.date_return:
             key = current.strftime("%Y-%m-%d")
+
             if key not in reservations_by_date:
                 reservations_by_date[key] = []
+
             reservations_by_date[key].append({
                 "name": r.userborrower.full_name if r.userborrower else "Unknown",
                 "date_borrowed": r.date_borrowed.strftime("%Y-%m-%d"),
@@ -2198,8 +2244,28 @@ def get_item_calendar(request, item_id):
                 "quantity": r.quantity,
                 "status": r.status.capitalize(),
             })
+
             current += timedelta(days=1)
 
+    # --- GROUP ADMIN BORROWS BY DATE ---
+    admin_by_date = {}
+    for ab in admin_borrows:
+        current = ab.date
+        while current <= ab.return_date:
+            key = current.strftime("%Y-%m-%d")
+
+            if key not in admin_by_date:
+                admin_by_date[key] = []
+
+            admin_by_date[key].append({
+                "quantity": ab.quantity,
+                "start": ab.date.strftime("%Y-%m-%d"),
+                "end": ab.return_date.strftime("%Y-%m-%d"),
+            })
+
+            current += timedelta(days=1)
+
+    # --- FORMAT OUTPUT ---
     data = {
         "reservations": [
             {
@@ -2209,9 +2275,15 @@ def get_item_calendar(request, item_id):
             }
             for r in reservations
         ],
+
         "blocked": [b.date.strftime("%Y-%m-%d") for b in blocked],
+
         "reservations_by_date": reservations_by_date,
+
+        # NEW: Admin borrow grouped by date
+        "admin_borrow": admin_by_date,
     }
+
     return Response(data, status=200)
 
 
@@ -2678,3 +2750,127 @@ def borrower_late_history(request):
     return JsonResponse(data, safe=False)
 
 
+def total_admin_borrow_for_date(item, target_date):
+    qs = AdminBorrow.objects.filter(
+        item=item,
+        date__lte=target_date,
+        return_date__gte=target_date
+    ).aggregate(total=Sum("quantity"))
+    return qs["total"] or 0
+
+
+def total_reservation_qty_for_date(item, target_date):
+    qs = Reservation.objects.filter(
+        item=item,
+        status__in=["pending", "approved", "in use"],
+        date_borrowed__lte=target_date,
+        date_return__gte=target_date,
+    ).aggregate(total=Sum("quantity"))
+    return qs["total"] or 0
+
+def compute_daily_availability(item, target_date):
+    total = item.qty
+    reserved = total_reservation_qty_for_date(item, target_date)
+    admin_used = total_admin_borrow_for_date(item, target_date)
+
+    available = max(total - reserved - admin_used, 0)
+
+    return {
+        "total": total,
+        "reserved": reserved,
+        "admin_borrowed": admin_used,
+        "available": available
+    }
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def create_admin_borrow(request, item_id):
+    try:
+        item = Item.objects.get(item_id=item_id)
+
+        start_date = parse_date(request.data.get("start_date"))
+        return_date = parse_date(request.data.get("return_date"))
+        qty = int(request.data.get("quantity"))
+
+        if not start_date or not return_date or qty < 1:
+            return Response({"error": "Invalid input"}, status=400)
+
+        if return_date < start_date:
+            return Response({"error": "Return date cannot be before start date"}, status=400)
+
+        # Check availability for entire date range
+        current = start_date
+        while current <= return_date:
+            avail = compute_daily_availability(item, current)
+            if qty > avail["available"]:
+                return Response({
+                    "error": "Not enough availability",
+                    "date": current.isoformat(),
+                    "available": avail["available"]
+                }, status=409)
+            current += timedelta(days=1)
+
+        # Passed → Save
+        ab = AdminBorrow.objects.create(
+            item=item,
+            date=start_date,
+            return_date=return_date,
+            quantity=qty
+        )
+
+        return Response({
+            "success": True,
+            "id": ab.id,
+            "message": "Admin borrow saved"
+        }, status=201)
+
+    except Item.DoesNotExist:
+        return Response({"error": "Item not found"}, status=404)
+
+
+@api_view(["PUT"])
+@permission_classes([AllowAny])
+def update_admin_borrow(request, pk):
+    try:
+        ab = AdminBorrow.objects.get(pk=pk)
+        item = ab.item
+
+        new_qty = int(request.data.get("quantity"))
+        new_return = parse_date(request.data.get("return_date"))
+
+        if new_qty < 1 or new_return < ab.date:
+            return Response({"error": "Invalid input"}, status=400)
+
+        # Validate entire new range
+        current = ab.date
+        while current <= new_return:
+            avail = compute_daily_availability(item, current)
+            # remove the old quantity first
+            avail["available"] += ab.quantity
+
+            if new_qty > avail["available"]:
+                return Response({
+                    "error": "Not enough availability",
+                    "date": current.isoformat(),
+                    "available": avail["available"]
+                }, status=409)
+            current += timedelta(days=1)
+
+        ab.quantity = new_qty
+        ab.return_date = new_return
+        ab.save()
+
+        return Response({"success": True})
+
+    except AdminBorrow.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+@api_view(["DELETE"])
+@permission_classes([AllowAny])
+def delete_admin_borrow(request, pk):
+    try:
+        ab = AdminBorrow.objects.get(pk=pk)
+        ab.delete()
+        return Response({"success": True})
+    except AdminBorrow.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)

@@ -34,7 +34,6 @@
     margin-bottom: 25px;
   }
 
-  /* Button styles */
   .btn {
     padding: 10px 20px;
     border: none;
@@ -58,7 +57,6 @@
     margin-bottom: 25px;
   }
 
-  /* Layout grid */
   .scanner-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -70,7 +68,6 @@
     .scanner-layout { grid-template-columns: 1fr; }
   }
 
-  /* Video feed */
   #video {
     width: 100%;
     aspect-ratio: 4/3;
@@ -79,7 +76,6 @@
     border: 2px solid var(--gray-border);
   }
 
-  /* Result Box */
   #result {
     background: #fff;
     border-radius: 12px;
@@ -101,7 +97,6 @@
     color: var(--primary);
   }
 
-  /* Feedback form */
   #feedbackForm {
     display: none;
     margin-top: 15px;
@@ -153,7 +148,6 @@
       </div>
     </div>
 
-      <!-- Feedback Form -->
       <div id="feedbackForm">
         <div class="section-header">Borrower & Item Details</div>
         <div id="borrowerDetails"></div>
@@ -177,7 +171,6 @@
   </div>
 </div>
 
-<!-- ✅ SweetAlert2 and jsQR -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
@@ -192,12 +185,10 @@
   const borrowerDetails = document.getElementById("borrowerDetails");
   const verificationSection = document.getElementById("verificationSection");
 
-
   let mode = null;
   let scanning = false;
   let lastQR = "";
 
-  // ⚙️ ESP32 IP
   const ESP32_IP = "10.92.122.200";
   const ESP32_CAPTURE_URL = `http://${ESP32_IP}/capture`;
 
@@ -209,6 +200,7 @@
     scanning = true;
     lastQR = "";
     feedbackForm.style.display = "none";
+    verificationSection.style.display = "block";
     statusEl.textContent = "Scanning for QR...";
     captureLoop();
   }
@@ -260,13 +252,12 @@
       .then(data => {
         if (data.error) {
           statusEl.textContent = "⚠️ " + data.error;
-          scanning = true; 
+          scanning = true;
           captureLoop();
         } else {
 
-          // 🔵 CLAIM MODE → show Verification Result box
           if (mode === "claim") {
-              verificationSection.style.display = "block"; // show section
+              verificationSection.style.display = "block";
 
               qrResultBox.innerHTML = `
                 <b>Borrower:</b> ${data.borrower}<br>
@@ -282,11 +273,29 @@
                 updateReservation(mode, cleanQR, data.borrower, data.item);
 
               qrResultBox.appendChild(claimBtn);
+
+              // AUTO CLAIM TIMER (15s)
+              let timerText = document.createElement("p");
+              timerText.style.color = "red";
+              timerText.style.marginTop = "10px";
+              qrResultBox.appendChild(timerText);
+
+              let secondsLeft = 15;
+              timerText.textContent = `Auto-claiming in ${secondsLeft}s...`;
+
+              const countdown = setInterval(() => {
+                secondsLeft--;
+                timerText.textContent = `Auto-claiming in ${secondsLeft}s...`;
+
+                if (secondsLeft <= 0) {
+                  clearInterval(countdown);
+                  updateReservation(mode, cleanQR, data.borrower, data.item);
+                }
+              }, 1000);
           }
-            
-          // 🔵 RETURN MODE → hide Verification Result section
+
           if (mode === "return") {
-              verificationSection.style.display = "none"; // hide everything!
+              verificationSection.style.display = "none";
 
               borrowerDetails.innerHTML = `
                 <b>Borrower:</b> ${data.borrower}<br>
@@ -305,12 +314,11 @@
       })
       .catch(err => {
         statusEl.textContent = "Error verifying QR: " + err;
-        scanning = true; 
+        scanning = true;
         captureLoop();
       });
   }
 
-  // ✅ CLAIM
   function updateReservation(mode, qr, borrower, item) {
     fetch(`/update_reservation/${mode}/${encodeURIComponent(qr)}/`, { method: "GET" })
       .then(r => r.json())
@@ -329,7 +337,6 @@
       });
   }
 
-  // ✅ RETURN + FEEDBACK
   function submitFeedback(qr, borrower, item) {
     const comment = document.getElementById("feedbackComment").value.trim();
     const returnStatus = document.getElementById("returnStatus").value;
