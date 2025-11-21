@@ -10,6 +10,7 @@ from collections import defaultdict
 from django.db import transaction
 from datetime import date, timedelta
 from django.db.models import Sum, Q
+from django.templatetags.static import static
 
 import datetime as dt
 import json
@@ -466,7 +467,6 @@ def statistics_data(request):
     return JsonResponse({"transactions": results})
 
 
-
 @login_required
 def export_excel(request):
 
@@ -474,10 +474,11 @@ def export_excel(request):
     end_date = request.GET.get("end")
     status_filter = request.GET.get("status")
     category_filter = request.GET.get("category")
-    report_filter = request.GET.get("report_type")   # NEW
+    report_filter = request.GET.get("report_type")
 
     qs = Reservation.objects.select_related("item", "userborrower").all()
 
+    # Filters
     if start_date:
         qs = qs.filter(date_borrowed__gte=parse_date(start_date))
     if end_date:
@@ -487,26 +488,29 @@ def export_excel(request):
     if category_filter and category_filter != "all":
         qs = qs.filter(item__category__iexact=category_filter)
 
-    # NEW DAMAGE/LOSS FILTER
+    # Damage/Loss filter
     if report_filter == "damage":
-        qs = qs.filter(report__report_type="Damage")
+        qs = qs.filter(damage_reports__report_type="Damage")
     elif report_filter == "loss":
-        qs = qs.filter(report__report_type="Loss")
+        qs = qs.filter(damage_reports__report_type="Loss")
 
     qs = qs.distinct()
 
-    data = [
-        {
-            "Transaction ID": r.transaction_id,
-            "Item ID": r.item.item_id if r.item else "",
-            "Item Name": r.item.name if r.item else "Unknown",
-            "Borrower Name": r.userborrower.full_name if r.userborrower else "Unknown",
+    # Build export data
+    data = []
+    for r in qs:
+        report = r.damage_reports.first()
+        report_type = report.report_type if report else "None"
+
+        data.append({
+            "Item Name": r.item.name,
+            "Category": r.item.category,
+            "Borrower": r.userborrower.full_name,
             "Borrowed At": r.date_borrowed.strftime("%Y-%m-%d"),
-            "Returned At": r.date_return.strftime("%Y-%m-%d") if r.date_return else "—",
+            "Returned At": r.date_return.strftime("%Y-%m-%d") if r.date_return else "",
+            "Report Type": report_type,
             "Status": r.status.capitalize(),
-        }
-        for r in qs
-    ]
+        })
 
     df = pd.DataFrame(data)
 
@@ -516,19 +520,19 @@ def export_excel(request):
 
     response = HttpResponse(
         output.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    response["Content-Disposition"] = 'attachment; filename="report.xlsx"'
+    response["Content-Disposition"] = "attachment; filename=report.xlsx"
     return response
+
 
 @login_required
 def export_pdf(request):
-
     start_date = request.GET.get("start")
     end_date = request.GET.get("end")
     status_filter = request.GET.get("status")
     category_filter = request.GET.get("category")
-    report_filter = request.GET.get("report_type")  # NEW
+    report_filter = request.GET.get("report_type")
 
     qs = Reservation.objects.select_related("item", "userborrower").all()
 
@@ -541,32 +545,40 @@ def export_pdf(request):
     if category_filter and category_filter != "all":
         qs = qs.filter(item__category__iexact=category_filter)
 
-    # NEW DAMAGE/LOSS FILTER
     if report_filter == "damage":
-        qs = qs.filter(report__report_type="Damage")
+        qs = qs.filter(damage_reports__report_type="Damage")
     elif report_filter == "loss":
-        qs = qs.filter(report__report_type="Loss")
+        qs = qs.filter(damage_reports__report_type="Loss")
 
     qs = qs.distinct()
 
-    transactions = [
-        {
-            "transaction_id": r.transaction_id,
-            "item_id": r.item.item_id if r.item else "",
-            "item_name": r.item.name if r.item else "Unknown",
-            "borrower_name": r.userborrower.full_name if r.userborrower else "Unknown",
-            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d"),
-            "returned_at": r.date_return.strftime("%Y-%m-%d") if r.date_return else "—",
-            "status": r.status.capitalize(),
-        }
-        for r in qs
-    ]
+    transactions = []
+    for r in qs:
+        report = r.damage_reports.first()
+        report_type = report.report_type if report else "None"
 
-    html = render_to_string("pdf_template.html", {"transactions": transactions})
+        transactions.append({
+            "item_name": r.item.name,
+            "category": r.item.category,
+            "borrower_name": r.userborrower.full_name,
+            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d"),
+            "returned_at": r.date_return.strftime("%Y-%m-%d") if r.date_return else "",
+            "report_type": report_type,
+            "status": r.status.capitalize(),
+        })
+
+    # 🔥 Build logo URL
+    logo_path = request.build_absolute_uri(static("Barangay Kauswagan Logo.png"))
+
+    html = render_to_string(
+        "pdf_template.html",
+        {"transactions": transactions, "logo_path": logo_path}
+    )
 
     response = HttpResponse(content_type="application/pdf")
-    response["Content-Disposition"] = 'attachment; filename=\"report.pdf\"'
-    pisa.CreatePDF(io.BytesIO(html.encode("utf-8")), dest=response)
+    response["Content-Disposition"] = "attachment; filename=report.pdf"
+
+    pisa.CreatePDF(html, dest=response)
     return response
 
 
@@ -2109,7 +2121,10 @@ def submit_damage_loss_report(request):
             quantity_affected=quantity_affected,
             description=description,
             image=image,
+            item=item,                # ✔ Save item
+            reservation=reservation,  # ✔ Save reservation
         )
+
 
         # -------------------------
         # AUTO DEDUCT FOR LOSS ONLY
