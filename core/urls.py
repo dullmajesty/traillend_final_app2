@@ -75,8 +75,9 @@ urlpatterns = [
     path('submit_feedback/', views.submit_feedback, name='submit_feedback'),
     path('monthly_reset/', views.monthly_reset, name='monthly_reset'),  # optional
 
-    path('damage_report/', views.damage_report_list, name='damage_report_list'),
-    path('api/damage-report/', views.submit_damage_report, name='submit_damage_report'),
+    path('damage_report/', views.damage_loss_report_list, name='damage_loss_report_list'),
+    path("api/in-use-items/", views.get_in_use_items, name="get_in_use_items"),
+    path('api/damage-report/', views.submit_damage_loss_report, name='submit_damage_loss_report'),
     path('api/item/<int:item_id>/calendar/', views.get_item_calendar, name='get_item_calendar'),
     path('api/item/<int:item_id>/block-toggle/', views.toggle_block_date, name='toggle_block_date'),
     path("api/item/<int:item_id>/cancel-reservations/", views.cancel_reservations_for_date),

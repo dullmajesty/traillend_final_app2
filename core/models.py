@@ -111,20 +111,35 @@ class Feedback(models.Model):
 
 
 class DamageReport(models.Model):
+    REPORT_TYPES = [
+        ('Damage', 'Damage'),
+        ('Loss', 'Loss'),
+    ]
+    
+    
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, null=True, blank=True)
+    reservation = models.ForeignKey(Reservation,on_delete=models.CASCADE,related_name="damage_reports", null=True, blank=True)
     reported_by = models.ForeignKey(UserBorrower, on_delete=models.CASCADE)
+    report_type = models.CharField(max_length=20, choices=REPORT_TYPES, default='Damage')  # ✅ NEW
+
     location = models.CharField(max_length=255)
     quantity_affected = models.PositiveIntegerField()
     description = models.TextField()
     image = models.ImageField(upload_to='damage_reports/', blank=True, null=True)
     date_reported = models.DateTimeField(auto_now_add=True)
+
     status = models.CharField(
         max_length=20,
-        choices=[('Pending', 'Pending'), ('Reviewed', 'Reviewed'), ('Resolved', 'Resolved')],
+        choices=[
+            ('Pending', 'Pending'),
+            ('Reviewed', 'Reviewed'),
+            ('Resolved', 'Resolved')
+        ],
         default='Pending'
     )
 
-    def str(self):
-        return f"{self.reported_by.full_name} - {self.status}"
+    def __str__(self):
+        return f"{self.report_type} - {self.reported_by.full_name} - {self.status}"
 
 class BlockedDate(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='blocked_dates')

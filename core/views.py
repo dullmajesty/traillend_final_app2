@@ -398,201 +398,83 @@ def transaction_log(request):
 
 # Statistics
 
+
 @login_required
 def statistics(request):
-    # ---- Filter parameters ----
-    start_date = request.GET.get('start')
-    end_date = request.GET.get('end')
-    item_filter = request.GET.get('items')
-
-    # ---- Base queryset ----
-    reservations = Reservation.objects.select_related('item', 'userborrower').all()
-
-    # Apply filters
-    if start_date:
-        reservations = reservations.filter(date_borrowed__gte=parse_date(start_date))
-    if end_date:
-        reservations = reservations.filter(date_borrowed__lte=parse_date(end_date))
-    if item_filter and item_filter != 'all':
-        reservations = reservations.filter(item_id=item_filter)
-
-    # ---- Transactions Table ----
-    transactions = [
-        {
-            "transaction_id": r.transaction_id,
-            "item_id": r.item.item_id,
-            "item_name": r.item.name,
-            "borrower_name": r.userborrower.full_name if r.userborrower else "Unknown",
-            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d"),
-            "returned_at": r.date_returned.strftime("%Y-%m-%d") if r.date_returned else "—",
-            "status": r.status.capitalize(),
-        }
-        for r in reservations.order_by("-date_borrowed")
-    ]
-
-    # ---- Summary ----
-    total_borrowings = reservations.count()
-
-    # Most borrowed item
-    most_borrowed_item = (
-        reservations.values("item__name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-        .first()
-    )
-    most_borrowed_item = most_borrowed_item["item__name"] if most_borrowed_item else "—"
-
-    # Top borrower
-    top_borrower = (
-        reservations.values("userborrower__full_name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-        .first()
-    )
-    top_borrower = top_borrower["userborrower__full_name"] if top_borrower else "—"
-
-    # ---- Chart data ----
-    borrowings_by_date = (
-        reservations.values("date_borrowed")
-        .annotate(count=Count("id"))
-        .order_by("date_borrowed")
-    )
-    chart_labels = [r["date_borrowed"].strftime("%Y-%m-%d") for r in borrowings_by_date]
-    chart_counts = [r["count"] for r in borrowings_by_date]
-
-    # ---- All items for filter dropdown ----
     all_items = Item.objects.all()
 
     context = {
         "items": all_items,
-        "transactions": transactions,
-        "total_borrowings": total_borrowings,
-        "most_borrowed_item": most_borrowed_item,
-        "top_borrower": top_borrower,
-        "chart_labels": chart_labels,
-        "chart_counts": chart_counts,
     }
-
     return render(request, "statistics.html", context)
 
-@require_GET
-@login_required
+
 def statistics_data(request):
-    """Return filtered statistics as JSON (for AJAX updates)."""
-    start_date = request.GET.get("start")
-    end_date = request.GET.get("end")
-    status_filter = request.GET.get("status")
-    category_filter = request.GET.get("category")
+    # ===== Filters =====
+    start = request.GET.get("start")
+    end = request.GET.get("end")
+    status_filter = request.GET.get("status", "all")
+    category_filter = request.GET.get("category", "all")
+    report_type_filter = request.GET.get("report_type", "all")
 
-    # Base queryset
-    qs = Reservation.objects.select_related("item", "userborrower").all()
+    reservations = Reservation.objects.select_related("item", "userborrower").all()
 
-    # --- Safely apply filters ---
-    if start_date:
-        qs = qs.filter(date_borrowed__gte=parse_date(start_date))
-    if end_date:
-        qs = qs.filter(date_borrowed__lte=parse_date(end_date))
-    if status_filter and status_filter != "all":
-        qs = qs.filter(status__iexact=status_filter)
-    if category_filter and category_filter != "all":
-        qs = qs.filter(item__category__iexact=category_filter)
+    # --- Date filter ---
+    if start:
+        reservations = reservations.filter(date_borrowed__gte=parse_date(start))
+    if end:
+        reservations = reservations.filter(date_borrowed__lte=parse_date(end))
 
-    # ✅ No need to get `categories` here — that’s for the main view (HTML page), not the JSON response
-    # categories = Item.objects.values_list('category', flat=True).distinct()
+    # --- Status filter ---
+    if status_filter != "all":
+        reservations = reservations.filter(status=status_filter)
 
-    # --- Transactions ---
-    transactions = [
-        {
-            "transaction_id": r.transaction_id,
-            "item_id": getattr(r.item, "item_id", ""),
-            "item_name": r.item.name if r.item else "Unknown",
+    # --- Category filter ---
+    if category_filter != "all":
+        reservations = reservations.filter(item__category=category_filter)
+
+    # Convert to list we can add damage/loss data into
+    results = []
+
+    for r in reservations:
+        # Check if the reservation has any damage/loss reports
+        report = r.damage_reports.first()
+
+        # Determine report type
+        if report:
+            report_type = report.report_type.lower()  # "Damage" or "Loss"
+        else:
+            report_type = "none"
+
+        # Apply the filter (damage/loss only)
+        if report_type_filter != "all":
+            if report_type_filter == "damage" and report_type != "damage":
+                continue
+            if report_type_filter == "loss" and report_type != "loss":
+                continue
+
+        results.append({
+            "item_name": r.item.name,
+            "category": r.item.category,
             "borrower_name": r.userborrower.full_name if r.userborrower else "Unknown",
-            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d") if r.date_borrowed else "—",
-            "returned_at": r.date_return.strftime("%Y-%m-%d") if r.date_return else "—",
-            "status": r.status.capitalize(),
-        }
-        for r in qs.order_by("-date_borrowed")
-    ]
-
-    # --- Summary ---
-    total_borrowings = qs.count()
-
-    most_item_qs = (
-        qs.values("item__name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-        .first()
-    )
-    most_item = most_item_qs["item__name"] if most_item_qs else "—"
-
-    top_borrower_qs = (
-        qs.values("userborrower__full_name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-        .first()
-    )
-    top_borrower = top_borrower_qs["userborrower__full_name"] if top_borrower_qs else "—"
-
-    # --- Chart Data ---
-   # --- Chart: Borrowings by Date + Status ---
-    borrowings_by_date = (
-        qs.values("date_borrowed", "status")
-        .annotate(count=Count("id"))
-        .order_by("date_borrowed")
-    )
-
-    # Group data by status for multi-line chart
-    chart_data = {}
-    for b in borrowings_by_date:
-        date_str = b["date_borrowed"].strftime("%Y-%m-%d") if b["date_borrowed"] else "Unknown"
-        status = b["status"].capitalize()
-        if status not in chart_data:
-            chart_data[status] = {}
-        chart_data[status][date_str] = b["count"]
-
-    # Collect all unique dates (x-axis labels)
-    all_dates = sorted({b["date_borrowed"].strftime("%Y-%m-%d") for b in borrowings_by_date if b["date_borrowed"]})
-
-    # Build datasets for each status
-    datasets = []
-    color_palette = {
-        "Pending": "#f59e0b",
-        "Approved": "#22c55e",
-        "In use": "#3b82f6",
-        "Returned": "#6366f1",
-        "Rejected": "#ef4444",
-        "Cancelled": "#9ca3af",
-    }
-
-    for status, date_counts in chart_data.items():
-        data = [date_counts.get(d, 0) for d in all_dates]
-        datasets.append({
-            "label": status,
-            "data": data,
-            "borderColor": color_palette.get(status, "#888"),
-            "backgroundColor": color_palette.get(status, "#888"),
-            "tension": 0.3,
-            "fill": False,
-            "borderWidth": 2
+            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d"),
+            "returned_at": r.date_return.strftime("%Y-%m-%d"),
+            "report_type": report_type.capitalize(),  # Damage / Loss / None
+            "status": r.status,
         })
 
-    return JsonResponse({
-        "labels": all_dates,
-        "datasets": datasets,
-        "total_borrowings": total_borrowings,
-        "most_item": most_item,
-        "top_borrower": top_borrower,
-        "transactions": transactions,
-    })
+    return JsonResponse({"transactions": results})
 
 
 
 @login_required
 def export_excel(request):
+
     start_date = request.GET.get("start")
     end_date = request.GET.get("end")
     status_filter = request.GET.get("status")
     category_filter = request.GET.get("category")
+    report_filter = request.GET.get("report_type")   # NEW
 
     qs = Reservation.objects.select_related("item", "userborrower").all()
 
@@ -605,13 +487,21 @@ def export_excel(request):
     if category_filter and category_filter != "all":
         qs = qs.filter(item__category__iexact=category_filter)
 
+    # NEW DAMAGE/LOSS FILTER
+    if report_filter == "damage":
+        qs = qs.filter(report__report_type="Damage")
+    elif report_filter == "loss":
+        qs = qs.filter(report__report_type="Loss")
+
+    qs = qs.distinct()
+
     data = [
         {
             "Transaction ID": r.transaction_id,
-            "Item ID": getattr(r.item, "item_id", ""),
+            "Item ID": r.item.item_id if r.item else "",
             "Item Name": r.item.name if r.item else "Unknown",
             "Borrower Name": r.userborrower.full_name if r.userborrower else "Unknown",
-            "Borrowed At": r.date_borrowed.strftime("%Y-%m-%d") if r.date_borrowed else "—",
+            "Borrowed At": r.date_borrowed.strftime("%Y-%m-%d"),
             "Returned At": r.date_return.strftime("%Y-%m-%d") if r.date_return else "—",
             "Status": r.status.capitalize(),
         }
@@ -619,25 +509,26 @@ def export_excel(request):
     ]
 
     df = pd.DataFrame(data)
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Transactions")
+        df.to_excel(writer, index=False, sheet_name="Report")
 
     response = HttpResponse(
         output.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = 'attachment; filename="transactions_report.xlsx"'
+    response["Content-Disposition"] = 'attachment; filename="report.xlsx"'
     return response
-
-
 
 @login_required
 def export_pdf(request):
+
     start_date = request.GET.get("start")
     end_date = request.GET.get("end")
     status_filter = request.GET.get("status")
     category_filter = request.GET.get("category")
+    report_filter = request.GET.get("report_type")  # NEW
 
     qs = Reservation.objects.select_related("item", "userborrower").all()
 
@@ -650,13 +541,21 @@ def export_pdf(request):
     if category_filter and category_filter != "all":
         qs = qs.filter(item__category__iexact=category_filter)
 
+    # NEW DAMAGE/LOSS FILTER
+    if report_filter == "damage":
+        qs = qs.filter(report__report_type="Damage")
+    elif report_filter == "loss":
+        qs = qs.filter(report__report_type="Loss")
+
+    qs = qs.distinct()
+
     transactions = [
         {
             "transaction_id": r.transaction_id,
-            "item_id": getattr(r.item, "item_id", ""),
+            "item_id": r.item.item_id if r.item else "",
             "item_name": r.item.name if r.item else "Unknown",
             "borrower_name": r.userborrower.full_name if r.userborrower else "Unknown",
-            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d") if r.date_borrowed else "—",
+            "borrowed_at": r.date_borrowed.strftime("%Y-%m-%d"),
             "returned_at": r.date_return.strftime("%Y-%m-%d") if r.date_return else "—",
             "status": r.status.capitalize(),
         }
@@ -664,10 +563,12 @@ def export_pdf(request):
     ]
 
     html = render_to_string("pdf_template.html", {"transactions": transactions})
+
     response = HttpResponse(content_type="application/pdf")
-    response["Content-Disposition"] = 'attachment; filename="transactions_report.pdf"'
+    response["Content-Disposition"] = 'attachment; filename=\"report.pdf\"'
     pisa.CreatePDF(io.BytesIO(html.encode("utf-8")), dest=response)
     return response
+
 
 
 def change_pass(request):
@@ -744,7 +645,7 @@ def api_register(request):
 
 
             # 🧩 Local development link — works, but user won't see the IP
-            verify_url = f"http://10.92.122.115:8000/api/verify-email/{uid}/{token}/"
+            verify_url = f"http://172.22.88.165:8000/api/verify-email/{uid}/{token}/"
 
 
             # HTML Email Template
@@ -2151,20 +2052,20 @@ def monthly_reset(request=None):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-def damage_report_list(request):
+def damage_loss_report_list(request):
     reports = DamageReport.objects.select_related('reported_by').order_by('-date_reported')
 
     report_data = []
     for r in reports:
-        # convert UTC → local timezone
         local_time = timezone.localtime(r.date_reported)
 
         report_data.append({
             'user_id': r.reported_by.id,
             'user_name': r.reported_by.full_name,
             'address': r.reported_by.address,
+            'type': r.report_type,   # ✅ NEW
             'image': r.image.url if r.image else 'No image',
-            'date': local_time.strftime("%Y-%m-%d %I:%M %p"), 
+            'date': local_time.strftime("%Y-%m-%d %I:%M %p"),
             'description': r.description,
             'quantity': r.quantity_affected,
             'location': r.location,
@@ -2173,30 +2074,107 @@ def damage_report_list(request):
 
     return render(request, 'damage_report.html', {'reports': report_data})
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
-def submit_damage_report(request):
+def submit_damage_loss_report(request):
+    """
+    Borrower submits a Damage or Loss report for an item currently in use.
+    Links to reservation + deducts item qty for Loss reports.
+    """
     try:
-        user_borrower = UserBorrower.objects.get(user=request.user)
-        location = request.data.get('location')
-        quantity_affected = request.data.get('quantity_affected')
-        description = request.data.get('description')
-        image = request.data.get('image')
+        borrower = UserBorrower.objects.get(user=request.user)
 
-        if not all([location, quantity_affected, description]):
-            return Response({'status': 'error', 'message': 'Missing required fields'}, status=400)
+        transaction_id = request.data.get("reservation_id")
+        item_id = request.data.get("item_id")
+        report_type = request.data.get("report_type")
+        location = request.data.get("location")
+        quantity_affected = int(request.data.get("quantity_affected"))
+        description = request.data.get("description")
+        image = request.data.get("image")
 
+        # Validate
+        if not all([transaction_id, item_id, report_type, location, description]):
+            return Response({"success": False, "message": "Missing required fields"}, status=400)
+
+        reservation = Reservation.objects.get(id=transaction_id, userborrower=borrower)
+        item = Item.objects.get(item_id=item_id)
+
+        # Create the report
         report = DamageReport.objects.create(
-            reported_by=user_borrower,
+            reported_by=borrower,
+            report_type=report_type,
             location=location,
             quantity_affected=quantity_affected,
             description=description,
-            image=image
+            image=image,
         )
-        return Response({'status': 'success', 'message': 'Damage report submitted successfully', 'id': report.id})
+
+        # -------------------------
+        # AUTO DEDUCT FOR LOSS ONLY
+        # -------------------------
+        if report_type.lower() == "loss":
+            if item.qty >= quantity_affected:
+                item.qty -= quantity_affected
+            else:
+                item.qty = 0     # never negative
+            item.save()
+
+        return Response({
+            "success": True,
+            "message": f"{report_type} report submitted successfully!",
+            "report_id": report.id
+        })
+
+    except Reservation.DoesNotExist:
+        return Response({"success": False, "message": "Reservation not found"}, status=404)
+
+    except Item.DoesNotExist:
+        return Response({"success": False, "message": "Item not found"}, status=404)
+
     except Exception as e:
-        return Response({'status': 'error', 'message': str(e)}, status=500)
+        return Response({"success": False, "message": str(e)}, status=500)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_in_use_items(request):
+    """Return all items currently in-use for the logged-in borrower."""
+    try:
+        # SAFER lookup to avoid DoesNotExist crashes
+        borrower = UserBorrower.objects.filter(user=request.user).first()
+        
+        if not borrower:
+            return Response({"success": True, "items": []}, status=200)
+
+        # FIX: Case-insensitive matching so database inconsistencies don't break API
+        reservations = (
+            Reservation.objects
+            .filter(userborrower=borrower, status__iexact='in use')
+            .select_related('item')
+            .order_by('-date_borrowed')
+        )
+
+        data = []
+        for r in reservations:
+            data.append({
+                "reservation_id": r.id,
+                "transaction_code": r.transaction_id,
+                "item_id": r.item.item_id,
+                "item_name": r.item.name,
+                "quantity": r.quantity,
+                "image": request.build_absolute_uri(r.item.image.url) if r.item.image else None,
+                "date_borrowed": r.date_borrowed.strftime("%Y-%m-%d"),
+                "date_return": r.date_return.strftime("%Y-%m-%d") if r.date_return else None,
+            })
+
+        return Response({"success": True, "items": data}, status=200)
+
+    except Exception as e:
+        return Response({"success": False, "error": str(e)}, status=500)
+
 
 
 # ITEM CALENDAR BLOCKDATE

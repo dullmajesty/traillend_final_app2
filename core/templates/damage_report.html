@@ -2,9 +2,10 @@
 
 {% block content %}
 <div class="damage-page">
+
   <!-- Sidebar (Live Details) -->
   <section class="report-details-card">
-    <h2 class="section-title">Live Damage Report</h2>
+    <h2 class="section-title">Live Report Preview</h2>
     <div id="report-details" class="report-details-empty">
       <p>Click any row to preview full report details.</p>
     </div>
@@ -13,7 +14,7 @@
   <!-- Main Table Section -->
   <section class="report-table-section">
     <div class="header-bar">
-      <h2>Damage Reports</h2>
+      <h2>Damage & Loss Reports</h2>
       <div class="search-wrapper">
         <input type="text" id="search-input" placeholder="Search by user or address..." />
         <i class="fa fa-search"></i>
@@ -26,6 +27,7 @@
       <table class="report-table">
         <thead>
           <tr>
+            <th>Type</th>
             <th>User</th>
             <th>Address</th>
             <th>Location</th>
@@ -34,10 +36,12 @@
             <th>Date Submitted</th>
           </tr>
         </thead>
+
         <tbody>
           {% if reports %}
             {% for r in reports %}
             <tr class="report-row"
+                data-type="{{ r.type }}"
                 data-user="{{ r.user_name }}"
                 data-address="{{ r.address }}"
                 data-image="{{ r.image }}"
@@ -45,23 +49,27 @@
                 data-location="{{ r.location }}"
                 data-quantity="{{ r.quantity }}"
                 data-description="{{ r.description }}">
+
+              <td><span class="type-badge {{ r.type|lower }}">{{ r.type }}</span></td>
               <td>{{ r.user_name }}</td>
               <td>{{ r.address }}</td>
               <td>{{ r.location }}</td>
               <td>{{ r.quantity }}</td>
+
               <td>
                 {% if r.image != "No image" %}
-                  <img src="{{ r.image }}" alt="Damage Image" class="thumb">
+                  <img src="{{ r.image }}" alt="Report Image" class="thumb">
                 {% else %}
                   <span class="no-img">No image</span>
                 {% endif %}
               </td>
+
               <td>{{ r.date }}</td>
             </tr>
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="6" class="no-data">No Reports Found</td>
+              <td colspan="7" class="no-data">No Reports Found</td>
             </tr>
           {% endif %}
         </tbody>
@@ -70,7 +78,7 @@
   </section>
 </div>
 
-<!-- ===================== CSS ===================== -->
+<!-- ===================== FULL CSS RESTORED ===================== -->
 <style>
 .damage-page {
   display: grid;
@@ -226,9 +234,26 @@
   font-style: italic;
   padding: 20px 0;
 }
+
+/* ===================== NEW BADGE CSS ===================== */
+.type-badge {
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.type-badge.damage {
+  background: #dc2626; /* red */
+}
+
+.type-badge.loss {
+  background: #1d4ed8; /* blue */
+}
 </style>
 
-<!-- ===================== JS ===================== -->
+<!-- ===================== JS UPDATE ===================== -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const rows = document.querySelectorAll(".report-row");
@@ -239,6 +264,7 @@ document.addEventListener("DOMContentLoaded", function () {
       rows.forEach(r => r.classList.remove("active"));
       this.classList.add("active");
 
+      const type = this.dataset.type;
       const user = this.dataset.user;
       const address = this.dataset.address;
       const image = this.dataset.image;
@@ -249,12 +275,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const imageHTML =
         image && image !== "No image"
-          ? `<img src="${image}" alt="Damage Image">`
+          ? `<img src="${image}" alt="Report Image">`
           : `<div class='no-img'>No image available</div>`;
 
       details.classList.remove("report-details-empty");
       details.innerHTML = `
+        <span class="type-badge ${type.toLowerCase()}">${type}</span>
+        <br><br>
         ${imageHTML}
+        <p><strong>Type:</strong> ${type}</p>
         <p><strong>User:</strong> ${user}</p>
         <p><strong>Address:</strong> ${address}</p>
         <p><strong>Date:</strong> ${date}</p>
@@ -266,7 +295,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  // Optional: simple search filter
+  // Search Filter
   const searchInput = document.getElementById("search-input");
   searchInput.addEventListener("keyup", function () {
     const value = this.value.toLowerCase();
@@ -278,4 +307,5 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 </script>
+
 {% endblock %}

@@ -2,494 +2,370 @@
 {% load static %}
 
 {% block content %}
+
 <div class="reports-wrap">
+
+  <!-- HEADER -->
   <header class="reports-header">
     <h1>Reports & Analytics</h1>
-    <p class="subtitle">Monitor item borrowings, user activity, and lending performance.</p>
+    <p class="subtitle">View, filter, and export transaction records.</p>
   </header>
 
-  <!-- Filters -->
-  <form id="reportFilters" class="filters" onsubmit="return false;">
-    <div class="filter-group">
-      <label for="start">Start</label>
-      <input type="date" id="start" name="start" value="{{ request.GET.start|default:'' }}">
-    </div>
+  <!-- ================= TOP FILTERS ================= -->
+  <div class="filters">
 
-    <div class="filter-group">
-      <label for="end">End</label>
-      <input type="date" id="end" name="end" value="{{ request.GET.end|default:'' }}">
-    </div>
-
-    <!-- ✅ Status Dropdown -->
-    <div class="filter-group">
-      <label for="status">Status</label>
-      <select id="status" name="status">
-        <option value="all" {% if request.GET.status == 'all' or not request.GET.status %}selected{% endif %}>All Status</option>
-        <option value="pending">Pending</option>
-        <option value="approved">Approved</option>
-        <option value="in use">In Use</option>
-        <option value="returned">Returned</option>
-        <option value="rejected">Rejected</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
-    </div>
-
-    <!-- ✅ Category Dropdown -->
-    <div class="filter-group">
-      <label for="category">Category</label>
-      <select id="category" name="category">
-        <option value="all" {% if request.GET.category == 'all' or not request.GET.category %}selected{% endif %}>All Categories</option>
-        <option value="Seating" {% if category == "Seating" %}selected{% endif %}>Seating</option>
-        <option value="Tables" {% if category == "Tables" %}selected{% endif %}>Tables</option>
-        <option value="Tent" {% if category == "Tent" %}selected{% endif %}>Tent</option>
-        <option value="Venues" {% if category == "Venues" %}selected{% endif %}>Venues</option>
-        <option value="Sport Equipment" {% if category == "Sport Equipment" %}selected{% endif %}>Sport Equipment</option>
-        <option value="Cooling Ventilation" {% if category == "Cooling Ventilation" %}selected{% endif %}>Cooling Ventilation</option>
-        <option value="Water Supply" {% if category == "Water Supply" %}selected{% endif %}>Water Supply</option>
-        <option value="Electrical Accessories" {% if category == "Electrical Accessories" %}selected{% endif %}>Electrical Accessories</option>
-        <option value="Audio-Visual Equipment" {% if category == "Audio-Visual Equipment" %}selected{% endif %}>Audio-Visual Equipment</option>
-        <option value="Transportation" {% if category == "Transportation" %}selected{% endif %}>Transportation</option>
-      </select>
-    </div>
-    
-    <div class="filter-actions">
-      <button id="generateBtn" class="btn btn-primary" type="button">Generate</button>
-      <button id="resetBtn" class="btn btn-ghost" type="button">Reset</button>
-    </div>
-  </form>
-
-  <!-- Top: Chart + Summary -->
-  <section class="report-top">
-    <div class="card chart-card">
-      <canvas id="reportChart" aria-label="Borrowings chart" role="img"></canvas>
-    </div>
-
-    <aside class="card summary-card">
-      <h2>Summary</h2>
-      <dl>
-        <dt>Total Borrowings</dt>
-        <dd id="totalBorrowings">{{ total_borrowings|default:"0" }}</dd>
-
-        <dt>Most Borrowed Item</dt>
-        <dd id="mostItem">{{ most_borrowed_item|default:"—" }}</dd>
-
-        <dt>Top Borrower</dt>
-        <dd id="topBorrower">{{ top_borrower|default:"—" }}</dd>
-      </dl>
-    </aside>
-  </section>
-
-  <!-- Transactions -->
-  <section class="card transaction-card">
-    <div class="transaction-header">
-      <h2>Transactions</h2>
-      <div class="export-group">
-        <button id="exportCsv" class="btn btn-small" type="button">CSV</button>
-        <button id="exportExcel" class="btn btn-small" type="button">Excel</button>
-        <button id="exportPdf" class="btn btn-small" type="button">PDF</button>
+      <!-- Manual Start Date -->
+      <div class="filter-group">
+          <label>Start Date</label>
+          <input type="date" id="startDate">
       </div>
-    </div>
 
-    <p class="muted">Showing transactions within the chosen date range</p>
+      <!-- Manual End Date -->
+      <div class="filter-group">
+          <label>End Date</label>
+          <input type="date" id="endDate">
+      </div>
 
-    <div class="table-wrap">
-      <table id="transactionsTable" class="transactions">
-        <thead>
-          <tr>
-            <th>Transaction ID</th>
-            <th>Item ID</th>
-            <th>Item Name</th>
-            <th>Borrower Name</th>
-            <th>Borrowed At</th>
-            <th>Returned At</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in transactions %}
-          <tr>
-            <td>{{ t.transaction_id }}</td>
-            <td>{{ t.item_id }}</td>
-            <td>{{ t.item_name }}</td>
-            <td>{{ t.borrower_name }}</td>
-            <td>{{ t.borrowed_at }}</td>
-            <td>{{ t.returned_at }}</td>
-            <td><span class="status {{ t.status|lower }}">{{ t.status }}</span></td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="7">No transactions found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+      <!-- Quick Ranges -->
+      <div class="filter-group">
+          <label>Date Range</label>
+          <select id="presetRange">
+              <option value="custom" selected>Custom</option>
+              <option value="today">Today</option>
+              <option value="this_week">Week</option>
+              <option value="this_month">Month</option>
+              <option value="annual">Annual</option>
+          </select>
+      </div>
+      <!-- DAMAGE / LOSS FILTER -->
+          <select id="reportTypeFilter" class="sub-filter">
+              <option value="all">All Reports</option>
+              <option value="damage">Damage Only</option>
+              <option value="loss">Loss Only</option>
+          </select>
+       </div>
+
+  <!-- ================= TRANSACTION TABLE ================= -->
+  <section class="card transaction-card">
+
+      <div class="transaction-header">
+          <h2>Transactions</h2>
+
+          <div class="table-filters">
+
+              <!-- Status Filter -->
+              <select id="statusFilter" class="sub-filter">
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="in use">In Use</option>
+                  <option value="returned">Returned</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="cancelled">Cancelled</option>
+              </select>
+
+              <!-- Category Filter -->
+              <select id="categoryFilter" class="sub-filter">
+                  <option value="all">All Categories</option>
+                  <option value="Seating">Seating</option>
+                  <option value="Tables">Tables</option>
+                  <option value="Tent">Tent</option>
+                  <option value="Venues">Venues</option>
+                  <option value="Sport Equipment">Sport Equipment</option>
+                  <option value="Cooling Ventilation">Cooling Ventilation</option>
+                  <option value="Water Supply">Water Supply</option>
+                  <option value="Electrical Accessories">Electrical Accessories</option>
+                  <option value="Audio-Visual Equipment">Audio-Visual Equipment</option>
+                  <option value="Transportation">Transportation</option>
+              </select>
+
+              <!-- EXPORT DROPDOWN -->
+              <div class="export-dropdown">
+                <button type="button" class="btn export-btn">Export ▼</button>
+                <div class="export-menu">
+                    <a id="exportExcel">Excel</a>
+                    <a id="exportPdf">PDF</a>
+                </div>
+              </div>
+
+          </div>
+      </div>
+
+      <p class="muted">Showing transactions based on selected filters.</p>
+
+      <div class="table-wrap">
+          <table id="transactionsTable" class="transactions">
+              <thead>
+                  <tr>
+                      <th>Item Name</th>
+                      <th>Category</th>
+                      <th>Borrower</th>
+                      <th>Borrowed At</th>
+                      <th>Returned At</th>
+                      <th>Report Type</th>
+                      <th>Status</th>
+                  </tr>
+              </thead>
+              <tbody></tbody>
+          </table>
+      </div>
+
   </section>
+
 </div>
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-{{ chart_labels|json_script:"chart-labels" }}
-{{ chart_counts|json_script:"chart-counts" }}
-
+<!-- ================= JAVASCRIPT ================= -->
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  // --- INITIAL CHART ---
-  const labels = JSON.parse(document.getElementById('chart-labels').textContent);
-  const data = JSON.parse(document.getElementById('chart-counts').textContent);
-  const ctx = document.getElementById('reportChart').getContext('2d');
 
-  window.reportChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [] // dynamic datasets
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'bottom',
-          labels: {
-            boxWidth: 20,
-            padding: 15
-          }
-        }
-      },
-      scales: {
-        x: { grid: { display: false } },
-        y: { beginAtZero: true, ticks: { stepSize: 1 } }
-      }
+// Format date → YYYY-MM-DD
+const fmt = d => d.toISOString().slice(0, 10);
+
+// Quick Date Range Handler
+function applyPresetRange(type) {
+    const startInput = document.getElementById("startDate");
+    const endInput = document.getElementById("endDate");
+
+    const today = new Date();
+    let start = new Date(today);
+
+    if (type === "today") {
+        start = today;
     }
-  });
+
+    if (type === "this_week") {
+        start.setDate(today.getDate() - today.getDay()); // Sunday → Today
+    }
+
+    if (type === "this_month") {
+        start = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+
+    if (type === "annual") {
+        start = new Date(today.getFullYear(), 0, 1); // Jan 1
+    }
+
+    startInput.value = fmt(start);
+    endInput.value = fmt(today);
+
+    updateTable();
+}
+
+// Preset range change
+document.getElementById("presetRange").addEventListener("change", function () {
+    if (this.value === "custom") return;
+    applyPresetRange(this.value);
+});
+
+// Manual date updates
+document.getElementById("startDate").addEventListener("change", updateTable);
+document.getElementById("endDate").addEventListener("change", updateTable);
+document.getElementById("reportTypeFilter").addEventListener("change", updateTable);
 
 
-  // --- GENERATE REPORT ---
-  document.getElementById('generateBtn').addEventListener('click', function() {
-    const start = document.getElementById('start').value;
-    const end = document.getElementById('end').value;
-    const status = document.getElementById('status').value;
-    const category = document.getElementById('category').value;
+// Status + Category filters
+["statusFilter", "categoryFilter"].forEach(id => {
+    document.getElementById(id).addEventListener("change", updateTable);
+});
 
-    console.log('Generating report with:', { start, end, status, category });
+// MAIN UPDATE FUNCTION
+function updateTable() {
+    const start = document.getElementById("startDate").value;
+    const end = document.getElementById("endDate").value;
+    const status = document.getElementById("statusFilter").value;
+    const category = document.getElementById("categoryFilter").value;
+    const reportType = document.getElementById("reportTypeFilter").value;
 
-    const params = new URLSearchParams({ start, end, status, category, t: Date.now() });
-
-    fetch(`/statistics/data/?${params.toString()}`, { cache: 'no-store' })
-      .then(response => response.json())
-      .then(data => {
-        console.log('Received data:', data);
-
-        // --- Update Chart ---
-        reportChart.data.labels = data.labels;
-        reportChart.data.datasets = data.datasets;  // multiple status lines
-        reportChart.update();
-
-        // --- Update Summary ---
-        document.getElementById('totalBorrowings').textContent = data.total_borrowings;
-        document.getElementById('mostItem').textContent = data.most_item;
-        document.getElementById('topBorrower').textContent = data.top_borrower;
-
-        // --- Update Table ---
-        const tbody = document.querySelector('#transactionsTable tbody');
-        if (!tbody) return;
-
-        tbody.innerHTML = '';
-        if (data.transactions.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7">No transactions found.</td></tr>';
-        } else {
-          data.transactions.forEach(t => {
-            tbody.innerHTML += `
-              <tr>
-                <td>${t.transaction_id}</td>
-                <td>${t.item_id}</td>
-                <td>${t.item_name}</td>
-                <td>${t.borrower_name}</td>
-                <td>${t.borrowed_at}</td>
-                <td>${t.returned_at}</td>
-                <td><span class="status ${t.status.toLowerCase()}">${t.status}</span></td>
-              </tr>`;
-          });
-        }
-      })
-      .catch(err => {
-        console.error('Error fetching statistics:', err);
-        alert('Failed to generate report.');
-      });
-  });
-
-  // --- Auto-refresh when filters change ---
-  ['start', 'end', 'status', 'category'].forEach(id => {
-    document.getElementById(id).addEventListener('change', () => {
-      document.getElementById('generateBtn').click();
+    const params = new URLSearchParams({
+        start,
+        end,
+        status,
+        category,
+        report_type: reportType,
+        t: Date.now(),
     });
-  });
 
-  // --- Reset Filters ---
-  document.getElementById('resetBtn').addEventListener('click', function() {
-    document.getElementById('start').value = '';
-    document.getElementById('end').value = '';
-    document.getElementById('status').value = 'all';
-    document.getElementById('category').value = 'all';
-    document.getElementById('generateBtn').click();
-  });
+    fetch(`/statistics/data/?${params.toString()}`)
+        .then(res => res.json())
+        .then(data => {
+            const tbody = document.querySelector("#transactionsTable tbody");
+            tbody.innerHTML = "";
+
+            if (!data.transactions.length) {
+                tbody.innerHTML = `<tr><td colspan="7">No records found.</td></tr>`;
+                return;
+            }
+
+            data.transactions.forEach(t => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${t.item_name}</td>
+                        <td>${t.category}</td>
+                        <td>${t.borrower_name}</td>
+                        <td>${t.borrowed_at}</td>
+                        <td>${t.returned_at}</td>
+                        <td>${t.report_type}</td>
+                        <td><span class="status ${t.status.toLowerCase()}">${t.status}</span></td>
+                    </tr>`;
+            });
+        });
+}
+
+
+// Load table on page load
+document.addEventListener("DOMContentLoaded", updateTable);
+
+// Export Handlers
+document.querySelector(".export-btn").addEventListener("click", () => {
+    document.querySelector(".export-menu").classList.toggle("show");
 });
 
-// --- Export buttons ---
-document.getElementById('exportExcel').addEventListener('click', function() {
-  const start = document.getElementById('start').value;
-  const end = document.getElementById('end').value;
-  const status = document.getElementById('status').value;
-  const category = document.getElementById('category').value;
+function exportFile(type) {
+    const start = document.getElementById("startDate").value;
+    const end = document.getElementById("endDate").value;
+    const status = document.getElementById("statusFilter").value;
+    const category = document.getElementById("categoryFilter").value;
 
-  const params = new URLSearchParams({ start, end, status, category });
-  window.location.href = `/statistics/export/excel/?${params.toString()}`;
+    const params = new URLSearchParams({ start, end, status, category });
 
-});
+    window.location.href = `/statistics/export/${type}/?${params.toString()}`;
+}
 
-document.getElementById('exportPdf').addEventListener('click', function() {
-  const start = document.getElementById('start').value;
-  const end = document.getElementById('end').value;
-  const status = document.getElementById('status').value;
-  const category = document.getElementById('category').value;
-
-  const params = new URLSearchParams({ start, end, status, category });
-  window.location.href = `/statistics/export/pdf/?${params.toString()}`;
-
-});
-
+document.getElementById("exportExcel").addEventListener("click", () => exportFile("excel"));
+document.getElementById("exportPdf").addEventListener("click", () => exportFile("pdf"));
 
 </script>
 
 
+<!-- ================= PROFESSIONAL CSS ================= -->
 <style>
-/* ========== Overall Layout ========== */
+
 .reports-wrap {
-  max-width: 1200px;
-  padding: 20px;
-  font-family: "Poppins", sans-serif;
-  color: #111827;
+    max-width: 1200px;
+    margin: auto;
+    padding: 20px;
+    font-family: "Poppins", sans-serif;
 }
 
-.reports-header h1 {
-  font-size: 26px;
-  margin-bottom: 4px;
-  color: #111827;
-}
+.reports-header h1 { font-size: 26px; }
+.subtitle { color: #6b7280; font-size: 14px; }
 
-.subtitle {
-  font-size: 14px;
-  color: #6b7280;
-  margin-bottom: 18px;
-}
-
-/* ========== Filters ========== */
+/* TOP FILTERS */
 .filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  background: #f9fafb;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  align-items: flex-end;
-  margin-bottom: 18px;
+    display: flex;
+    gap: 20px;
+    background: #f8fafc;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 25px;
 }
 
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-}
+.filter-group { display: flex; flex-direction: column; }
 
 .filter-group label {
-  font-weight: 600;
-  color: #374151;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 5px;
 }
 
-.filter-group input,
+.filter-group input[type="date"],
 .filter-group select {
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  min-width: 140px;
-  font-size: 14px;
-  transition: border 0.2s, box-shadow 0.2s;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: white;
+    font-size: 14px;
+    outline: none;
+    transition: .2s;
 }
 
 .filter-group input:focus,
 .filter-group select:focus {
-  outline: none;
-  border-color: #2b7cff;
-  box-shadow: 0 0 0 3px rgba(43,124,255,0.1);
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,.3);
 }
 
-.filter-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-}
-
-.btn {
-  padding: 8px 12px;
-  font-size: 13px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-
-.btn-primary {
-  background: #2b7cff;
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(43,124,255,0.15);
-}
-
-.btn-primary:hover { background: #1e5fd3; }
-
-.btn-ghost {
-  background: transparent;
-  color: #374151;
-  border: 1px solid #e5e7eb;
-}
-
-.btn-ghost:hover { background: #f3f4f6; }
-
-/* ========== Chart + Summary ========== */
-.report-top {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 18px;
-  align-items: stretch;
-  flex-wrap: wrap;
-}
-
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 14px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-}
-
-.chart-card {
-  flex: 2 1 60%;
-  min-width: 260px;
-  height: 240px;
-}
-
-.chart-card canvas {
-  width: 100% !important;
-  height: 200px !important;
-}
-
-.summary-card {
-  flex: 1 1 35%;
-  font-size: 14px;
-}
-
-.summary-card h2 {
-  font-size: 16px;
-  margin-bottom: 10px;
-  color: #111827;
-}
-
-.summary-card dt {
-  color: #6b7280;
-  font-size: 13px;
-  margin-top: 6px;
-}
-
-.summary-card dd {
-  margin: 2px 0 6px 0;
-  font-weight: 600;
-  color: #111827;
-}
-
-/* ========== Transactions Table ========== */
+/* TRANSACTION CARD */
 .transaction-card {
-  margin-top: 10px;
+    padding: 20px;
+    border-radius: 12px;
+    background: white;
+    border: 1px solid #e2e8f0;
 }
 
 .transaction-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.export-group .btn-small {
-  padding: 6px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
+.table-filters { display: flex; gap: 10px; }
+
+.sub-filter {
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
 }
 
-.export-group .btn-small:hover {
-  background: #e0e7ff;
-  border-color: #c7d2fe;
+/* EXPORT DROPDOWN */
+.export-dropdown { position: relative; }
+.export-btn {
+    background: #e2e8f0;
+    padding: 8px 12px;
+    border-radius: 6px;
 }
+.export-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 35px;
+    background: white;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    width: 130px;
+}
+.export-menu.show { display: block; }
+.export-menu a {
+    padding: 10px;
+    display: block;
+    cursor: pointer;
+}
+.export-menu a:hover { background: #f1f5f9; }
 
-.muted {
-  color: #6b7280;
-  font-size: 13px;
-  margin: 8px 0 0 0;
-}
-
-.table-wrap {
-  overflow-x: auto;
-  margin-top: 10px;
-}
+/* TABLE */
+.table-wrap { margin-top: 15px; overflow-x: auto; }
 
 .transactions {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  min-width: 720px;
+    width: 100%;
+    border-collapse: collapse;
 }
 
-.transactions th,
+.transactions th {
+    background: #f1f5f9;
+    padding: 10px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
 .transactions td {
-  border: 1px solid #e5e7eb;
-  padding: 8px 10px;
-  text-align: center;
+    padding: 10px;
+    border-bottom: 1px solid #e2e8f0;
 }
 
-.transactions thead th {
-  background: #f3f4f6;
-  color: #374151;
-  font-weight: 600;
-  font-size: 12.5px;
-}
-
-.transactions tr:hover {
-  background: #f9fafb;
-  transition: background 0.2s ease;
-}
-
-/* ========== Status Colors ========== */
+/* STATUS COLORS */
 .status {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: capitalize;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
 }
-.status.approved { background: #dcfce7; color: #166534; }
-.status.borrowed { background: #dbeafe; color: #1e40af; }
-.status.returned { background: #fef9c3; color: #854d0e; }
-.status.declined { background: #fee2e2; color: #991b1b; }
 
-/* ========== Responsive ========== */
-@media (max-width: 880px) {
-  .report-top { flex-direction: column; }
-  .filter-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
-  .filters { gap: 10px; }
-  .transactions { min-width: 600px; }
-}
+.status.pending { background:#fef3c7;color:#b45309; }
+.status.approved { background:#dcfce7;color:#166534; }
+.status["in use"] { background:#dbeafe;color:#1e40af; }
+.status.returned { background:#fef9c3;color:#854d0e; }
+.status.rejected { background:#fee2e2;color:#991b1b; }
+.status.cancelled { background:#e4e4e7;color:#374151; }
+
 </style>
+
 {% endblock %}
