@@ -85,6 +85,8 @@ urlpatterns = [
     path("statistics/data/", views.statistics_data, name="statistics_data"),
     path("statistics/export/excel/", views.export_excel, name="export_excel"),
     path("statistics/export/pdf/", views.export_pdf, name="export_pdf"),
+    path("statistics/export/docx/", views.export_docx, name="export_docx"),
+
 
     path("api/me_borrower/", views.me_borrower),
     path("api/late-history/", views.borrower_late_history, name="borrower_late_history"),
@@ -92,7 +94,19 @@ urlpatterns = [
     path("api/item/<int:item_id>/admin-borrow/", views.create_admin_borrow, name="create_admin_borrow"),
     path("api/admin-borrow/<int:pk>/update/", views.update_admin_borrow, name="update_admin_borrow"),
     path("api/admin-borrow/<int:pk>/delete/", views.delete_admin_borrow, name="delete_admin_borrow"),
+    # ------------ ADMIN BORROW ------------
+    # Create new direct borrow
+    path("api/item/<int:item_id>/admin-borrow/", views.create_admin_borrow),
 
+    # List direct borrows for a date
+    path("api/item/<int:item_id>/admin-borrow/list/", views.admin_borrow_list),
+
+    # Mark direct borrow as returned
+    path("api/admin-borrow/<int:pk>/return/", views.return_admin_borrow),
+
+    path("api/suggest-items/", views.suggest_items, name="suggest-items"),
+    path("damage-report/update-status/<int:report_id>/", views.update_report_status, name='update_report_status'),
+    path("api/item/<int:item_id>/admin-borrow/", views.admin_borrow_create, name="admin_borrow_create"),
 
 
 

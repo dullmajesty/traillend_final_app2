@@ -48,7 +48,14 @@
   .btn-primary:hover { background: var(--primary-hover); }
   .btn-success { background: var(--success); }
   .btn-danger { background: var(--danger); }
-
+  input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--gray-border);
+    margin-bottom: 10px;
+    font-family: "Poppins";
+  }
   .controls {
     display: flex;
     justify-content: center;
@@ -256,52 +263,72 @@
           captureLoop();
         } else {
 
-          if (mode === "claim") {
-              verificationSection.style.display = "block";
+        if (mode === "claim") {
+            verificationSection.style.display = "block";
 
-              qrResultBox.innerHTML = `
+            let itemsHTML = "";
+            data.items.forEach(it => {
+                itemsHTML += `
+                    <div style="margin-left:10px; margin-top:5px;">
+                        • <b>${it.name}</b> — Qty: ${it.quantity}
+                    </div>
+                `;
+            });
+
+            // Construct result box (same layout as before)
+            qrResultBox.innerHTML = `
                 <b>Borrower:</b> ${data.borrower}<br>
-                <b>Item:</b> ${data.item}<br>
-                <b>Quantity Borrowed:</b> ${data.quantity}<br>
-                <b>Status:</b> ${data.status}<br><br>
-              `;
+                <b>Status:</b> ${data.status}<br>
+                <b>Borrowed:</b> ${data.start} → ${data.end}<br><br>
 
-              const claimBtn = document.createElement("button");
-              claimBtn.textContent = "Confirm Claim";
-              claimBtn.className = "btn btn-success";
-              claimBtn.onclick = () =>
-                updateReservation(mode, cleanQR, data.borrower, data.item);
+                <b>Items Borrowed:</b><br>
+                ${itemsHTML}<br>
 
-              qrResultBox.appendChild(claimBtn);
+                <!-- NEW Delivered By input -->
+                <label style="margin-top:10px;"><b>Delivered By:</b></label>
+                <input id="deliveredByInput"
+                      type="text"
+                      placeholder="Enter staff name"
+                      style="padding:8px; width:100%; border-radius:6px; border:1px solid #ccc; margin-top:6px; margin-bottom:12px;">
+            `;
 
-              // AUTO CLAIM TIMER (15s)
-              let timerText = document.createElement("p");
-              timerText.style.color = "red";
-              timerText.style.marginTop = "10px";
-              qrResultBox.appendChild(timerText);
+            // Create Confirm button
+            const claimBtn = document.createElement("button");
+            claimBtn.textContent = "Confirm Claim";
+            claimBtn.className = "btn btn-success";
 
-              let secondsLeft = 15;
-              timerText.textContent = `Auto-claiming in ${secondsLeft}s...`;
+            claimBtn.onclick = () => {
+                const deliveredBy = document.getElementById("deliveredByInput").value.trim();
 
-              const countdown = setInterval(() => {
-                secondsLeft--;
-                timerText.textContent = `Auto-claiming in ${secondsLeft}s...`;
-
-                if (secondsLeft <= 0) {
-                  clearInterval(countdown);
-                  updateReservation(mode, cleanQR, data.borrower, data.item);
+                if (!deliveredBy) {
+                    Swal.fire("Error", "Please enter who delivered the item.", "error");
+                    return;
                 }
-              }, 1000);
-          }
+
+                updateReservation(mode, cleanQR, deliveredBy);
+            };
+
+            qrResultBox.appendChild(claimBtn);
+        }
+
 
           if (mode === "return") {
               verificationSection.style.display = "none";
 
+              let returnItemsHTML = "";
+              data.items.forEach(it => {
+                returnItemsHTML += `<div style="margin-left:10px; margin-top:5px;">
+                    • <b>${it.name}</b> — Qty: ${it.quantity}
+                  </div>`;
+              });
+
               borrowerDetails.innerHTML = `
                 <b>Borrower:</b> ${data.borrower}<br>
-                <b>Item:</b> ${data.item}<br>
-                <b>Quantity Borrowed:</b> ${data.quantity}<br>
                 <b>Status:</b> ${data.status}<br>
+                <b>Borrowed:</b> ${data.start} → ${data.end}<br><br>
+
+                <b>Items:</b><br>
+                ${returnItemsHTML}
               `;
 
               feedbackForm.style.display = "block";
@@ -319,22 +346,27 @@
       });
   }
 
-  function updateReservation(mode, qr, borrower, item) {
-    fetch(`/update_reservation/${mode}/${encodeURIComponent(qr)}/`, { method: "GET" })
-      .then(r => r.json())
-      .then(data => {
-        beep();
-        Swal.fire({
-          icon: "success",
-          title: "Borrower Claimed Item ✅",
-          text: `${borrower} has successfully claimed '${item}'.`,
-          confirmButtonColor: "#28a745"
-        }).then(() => window.location.href = "/verification/");
-      })
-      .catch(err => {
-        console.error("Error updating reservation:", err);
-        Swal.fire("Error", "Failed to update reservation: " + err.message, "error");
-      });
+  function updateReservation(mode, qr, deliveredBy) {
+
+      // Build request URL including delivered_by parameter
+      const url = `/update_reservation/${mode}/${encodeURIComponent(qr)}/?delivered_by=${encodeURIComponent(deliveredBy)}`;
+
+      fetch(url, { method: "GET" })
+          .then(r => r.json())
+          .then(data => {
+              beep();
+
+              Swal.fire({
+                  icon: "success",
+                  title: "Borrower Claimed Item ✅",
+                  text: `Claim recorded successfully.\nDelivered by: ${deliveredBy}`,
+                  confirmButtonColor: "#28a745"
+              }).then(() => window.location.href = "/verification/");
+          })
+          .catch(err => {
+              console.error("Error updating reservation:", err);
+              Swal.fire("Error", "Failed to update reservation: " + err.message, "error");
+          });
   }
 
   function submitFeedback(qr, borrower, item) {

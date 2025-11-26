@@ -80,12 +80,6 @@
     border-color: #f5c2c2;
   }
 
-  .priority-badge.medium {
-    color: #92400e;
-    background: #fff4e6;
-    border-color: #ffd9b3;
-  }
-
   .priority-badge.low {
     color: #166534;
     background: #e7f8ec;
@@ -115,8 +109,6 @@
   <div class="priority-badge {{ reservation.priority|lower }}">
     {% if reservation.priority == "High" %}
       High
-    {% elif reservation.priority == "Medium" %}
-      Medium
     {% else %}
       Low
     {% endif %}

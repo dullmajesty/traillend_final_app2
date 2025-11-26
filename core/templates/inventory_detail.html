@@ -67,32 +67,89 @@
   </div>
 </section>
 
-<!-- 🔹 ADMIN BORROW MODAL -->
+<!-- 🔹 NEW WIDE LANDSCAPE ADMIN BORROW MODAL -->
 <div id="adminBorrowModal" class="modal-overlay">
-  <div class="modal-content">
-    <h2 class="modal-title">Adjust Quantity for <span id="modalDateDisplay"></span></h2>
 
-    <div class="modal-section">
-      <p><strong>Total Quantity:</strong> <span id="modalTotalQty"></span></p>
-      <p><strong>Reserved:</strong> <span id="modalReservedQty"></span></p>
-      <p><strong>Admin Borrowed:</strong> <span id="modalAdminBorrowed"></span></p>
-      <p><strong>Available:</strong> <span id="modalAvailableQty" class="available-highlight"></span></p>
+  <div class="admin-modal-wide">
+
+    <!-- HEADER -->
+    <div class="admin-header">
+      <h2>Admin Direct Borrow – <span id="modalDateDisplay"></span></h2>
+      <button id="closeModalBtn" class="close-btn">✖</button>
     </div>
 
-    <div class="modal-section">
-      <label><strong>Borrow Quantity:</strong></label>
-      <input type="number" id="adminBorrowQty" min="1" class="modal-input" placeholder="Enter borrowed qty">
+    <!-- ROW 1 — SUMMARY + FORM -->
+    <div class="row-top">
 
-      <label><strong>Return Date:</strong></label>
-      <input type="date" id="adminReturnDate" class="modal-input">
+      <!-- SUMMARY BOX -->
+      <div class="summary-box-wide">
+        <h3>Item Summary</h3>
+        <p><strong>Total Quantity:</strong> <span id="modalTotalQty"></span></p>
+        <p><strong>Reserved:</strong> <span id="modalReservedQty"></span></p>
+        <p><strong>Admin Direct Borrowed:</strong> <span id="modalAdminBorrowed"></span></p>
+        <p><strong>Available:</strong> <span id="modalAvailableQty" class="avail"></span></p>
+      </div>
+
+      <!-- FORM -->
+      <div class="form-box-wide">
+        <h3>Borrow Information</h3>
+
+        <label>Borrower Name</label>
+        <input type="text" id="ab_name">
+
+        <label>Contact Number</label>
+        <input type="text" id="ab_contact">
+
+        <label>Address</label>
+        <textarea id="ab_address"></textarea>
+
+        <label>Purpose</label>
+        <textarea id="ab_purpose"></textarea>
+
+        <label>Delivered By</label>
+        <input type="text" id="ab_delivered">
+
+        <label>Borrow Quantity</label>
+        <input type="number" id="adminBorrowQty" min="1">
+
+        <label>Return Date</label>
+        <input type="date" id="adminReturnDate">
+
+        <button id="saveAdminBorrowBtn" class="btn-primary full-btn">Save</button>
+      </div>
+
     </div>
 
-    <div class="modal-buttons">
-      <button class="btn-primary" id="saveAdminBorrowBtn">Save</button>
-      <button class="btn-warning" id="closeModalBtn">Cancel</button>
+    <!-- ROW 2 — HISTORY TABLE -->
+    <div class="row-bottom">
+      <h3>Admin Direct Borrow History</h3>
+
+      <div class="history-container">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Contact</th>
+              <th>Qty</th>
+              <th>Return</th>
+              <th>Status</th>
+              <th>Delivered By</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="adminBorrowListBody">
+            <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
+
   </div>
+
 </div>
+
+
 
 <!-- FULLCALENDAR -->
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
@@ -260,7 +317,6 @@ body {
   background: white;
   border-radius: 14px;
   padding: 25px;
-  width: 420px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.18);
   animation: fadeIn 0.25s ease;
 }
@@ -327,6 +383,174 @@ body {
   .item-calendar-row { flex-direction: column; align-items: center; }
   .calendar-container, .item-card { width: 90%; }
 }
+/* WIDE LANDSCAPE MODAL */
+.admin-modal-wide {
+  width: 1100px;
+  max-height: 92vh;
+  background: #fff;
+  border-radius: 14px;
+  overflow-y: auto;   
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 6px 25px rgba(0,0,0,0.25);
+}
+
+/* Header */
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  background: #1e3a8a;
+  color: white;
+  padding: 16px;
+  align-items: center;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: white;
+  cursor: pointer;
+}
+
+/* ROW 1 — summary + form */
+/* ROW 1 — summary + form */
+.row-top {
+  display: flex;
+  gap: 25px;
+  padding: 20px;
+  background: #f8fafc;
+}
+
+/* SUMMARY BOX */
+.summary-box-wide {
+  flex: 0.7;
+  background: #ffffff;
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+}
+
+.summary-box-wide h3 {
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.summary-box-wide p {
+  margin: 6px 0;
+}
+
+/* AVAILABILITY HIGHLIGHT */
+.avail {
+  font-weight: bold;
+  color: #2563eb;
+}
+
+/* FORM BOX */
+.form-box-wide {
+  flex: 2;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+}
+
+.form-box-wide h3 {
+  grid-column: 1 / 3;
+  margin-bottom: 5px;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.form-box-wide label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.form-box-wide input,
+.form-box-wide textarea {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* SAVE BUTTON FULL WIDTH */
+.full-btn {
+  grid-column: 1 / 3;
+  margin-top: 5px;
+  width: 100%;
+  padding: 12px;
+  font-size: 1rem;
+}
+
+/* ROW 2 — History */
+.row-bottom {
+  padding: 20px;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+}
+
+.row-bottom h3 {
+  color: #1e3a8a;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+/* HISTORY TABLE */
+.history-container {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th, 
+.history-table td {
+  border: 1px solid #e5e7eb;
+  padding: 10px;
+  text-align: left;
+}
+
+.history-table th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+.history-table tr:nth-child(even) {
+  background: #fafafa;
+}
+
+/* Scrollbar */
+.history-container::-webkit-scrollbar {
+  width: 8px;
+}
+.history-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.modal-overlay {
+  overflow-y: auto;       /* enable scrolling of whole modal */
+  pointer-events: auto;   /* ensure clicks pass normally */
+}
+
+
 </style>
 
 <!-- ---------------------------------------------------------
@@ -352,6 +576,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const adminReturnDateInput = document.getElementById("adminReturnDate");
   const saveAdminBorrowBtn = document.getElementById("saveAdminBorrowBtn");
   const closeModalBtn = document.getElementById("closeModalBtn");
+  
+  const ab_name = document.getElementById("ab_name");
+  const ab_contact = document.getElementById("ab_contact");
+  const ab_address = document.getElementById("ab_address");
+  const ab_purpose = document.getElementById("ab_purpose");
+  const ab_delivered = document.getElementById("ab_delivered");
+
 
   let selectedDate = null;
   let calendarData = {};
@@ -410,34 +641,78 @@ document.addEventListener("DOMContentLoaded", async () => {
   /* --------------------------------------------------------
      🔹 OPEN MODAL
   ---------------------------------------------------------- */
-  function openAdminBorrowModal(dateStr) {
-    selectedDate = dateStr;
-    modalDateDisplay.textContent = dateStr;
+  async function openAdminBorrowModal(dateStr) {
+      selectedDate = dateStr;
+      modalDateDisplay.textContent = dateStr;
 
-    const total = Number("{{ item.qty }}");
-    const reservationsByDate = calendarData.reservations_by_date || {};
-    const adminBorrowByDate = calendarData.admin_borrow || {};
+      const total = Number("{{ item.qty }}");
+      const reservationsByDate = calendarData.reservations_by_date || {};
+      const adminBorrowByDate = calendarData.admin_borrow_full || {};
 
-    const reserved = reservationsByDate[dateStr]
-      ? reservationsByDate[dateStr].reduce((sum, r) => sum + r.quantity, 0)
-      : 0;
 
-    const adminBorrowed = adminBorrowByDate[dateStr]
-      ? adminBorrowByDate[dateStr].reduce((sum, x) => sum + x.quantity, 0)
-      : 0;
 
-    const available = total - reserved - adminBorrowed;
 
-    modalTotalQty.textContent = total;
-    modalReservedQty.textContent = reserved;
-    modalAdminBorrowed.textContent = adminBorrowed;
-    modalAvailableQty.textContent = available;
+      const reserved = reservationsByDate[dateStr]
+          ? reservationsByDate[dateStr].reduce((sum, r) => sum + r.quantity, 0)
+          : 0;
 
-    adminBorrowQtyInput.value = "";
-    adminReturnDateInput.value = "";
+      const adminBorrowed = adminBorrowByDate[dateStr]
+          ? adminBorrowByDate[dateStr].reduce((sum, x) => sum + x.quantity, 0)
+          : 0;
 
-    modal.style.display = "flex";
+      const available = total - reserved - adminBorrowed;
+
+      modalTotalQty.textContent = total;
+      modalReservedQty.textContent = reserved;
+      modalAdminBorrowed.textContent = adminBorrowed;
+      modalAvailableQty.textContent = available;
+
+      ab_name.value = "";
+      ab_contact.value = "";
+      ab_address.value = "";
+      ab_purpose.value = "";
+      ab_delivered.value = "";
+      adminBorrowQtyInput.value = "";
+      adminReturnDateInput.value = "";
+
+      await loadAdminBorrowTable(dateStr);
+
+      modal.style.display = "flex";
   }
+
+    async function loadAdminBorrowTable(dateStr) {
+        const res = await fetch(`/api/item/${itemId}/admin-borrow/list/?date=${dateStr}`);
+        const data = await res.json();
+
+        const tbody = document.getElementById("adminBorrowListBody");
+        tbody.innerHTML = "";
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">No direct borrow records</td></tr>`;
+            return;
+        }
+
+        data.forEach(row => {
+            tbody.innerHTML += `
+                <tr>
+                  <td>${row.transaction_id}</td>
+                  <td>${row.borrower_name || "—"}</td>
+                  <td>${row.contact_number || "—"}</td>
+                  <td>${row.quantity}</td>
+                  <td>${row.return_date}</td>
+                  <td>${row.status}</td>
+                  <td>${row.delivered_by || "—"}</td>
+                  <td>
+                    <button class="btn-primary"
+                        onclick="returnAdminBorrow(${row.id})"
+                        ${row.status === "Returned" ? "disabled" : ""}>
+                        Return
+                    </button>
+                  </td>
+                </tr>
+            `;
+        });
+    }
 
   /* --------------------------------------------------------
      🔹 CLOSE MODAL
@@ -450,50 +725,93 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.target === modal) closeModal();
   });
 
-  /* --------------------------------------------------------
-     🔹 SAVE ADMIN BORROW
-  ---------------------------------------------------------- */
-  saveAdminBorrowBtn.addEventListener("click", async () => {
-    if (!selectedDate) return;
+/* --------------------------------------------------------
+   🔹 SAVE DIRECT ADMIN BORROW
+---------------------------------------------------------- */
+saveAdminBorrowBtn.addEventListener("click", async () => {
 
-    const qty = adminBorrowQtyInput.value;
-    const returnDate = adminReturnDateInput.value;
+    // Validate fields
+    if (!ab_name.value.trim() ||
+        !ab_contact.value.trim() ||
+        !adminBorrowQtyInput.value ||
+        !adminReturnDateInput.value) {
 
-    if (!qty || qty < 1) {
-      showToast("Enter a valid borrow quantity", "error");
-      return;
+        showToast("Please fill in all required fields.", "error");
+        return;
     }
 
-    if (!returnDate) {
-      showToast("Select a return date", "error");
-      return;
+    const available = Number(modalAvailableQty.textContent);
+    const borrowQty = Number(adminBorrowQtyInput.value);
+
+    if (borrowQty > available) {
+        showToast("Not enough available items for this date.", "error");
+        return;
     }
 
     const payload = {
-      start_date: selectedDate,
-      return_date: returnDate,
-      quantity: qty
+        date: selectedDate,
+        return_date: adminReturnDateInput.value,
+        quantity: adminBorrowQtyInput.value,
+        borrower_name: ab_name.value,
+        contact_number: ab_contact.value,
+        address: ab_address.value,
+        purpose: ab_purpose.value,
+        delivered_by: ab_delivered.value
     };
 
     const res = await fetch(`/api/item/${itemId}/admin-borrow/`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      showToast(data.error || "Failed to save", "error");
-      return;
+        showToast(data.error || "Failed to save borrow record.", "error");
+        return;
     }
 
-    showToast("Admin borrow saved!", "success");
-    closeModal();
+    // SUCCESS POPUP! 🎉
+    showToast("Admin Borrow Successfully Recorded!", "success");
 
+    // Refresh UI
     await initCalendar();
-    renderTable(selectedDate);
-  });
+    await loadAdminBorrowTable(selectedDate);
+    await openAdminBorrowModal(selectedDate);  // refresh summary instantly
+});
+
+
+async function returnAdminBorrow(id) {
+    const res = await fetch(`/api/admin-borrow/${id}/return/`, {
+        method: "POST"
+    });
+
+    if (!res.ok) {
+        showToast("Error returning item", "error");
+        return;
+    }
+
+    const data = await res.json();
+    showToast(data.message, "success");
+
+    // 🔹 Find the button that triggered Return
+    const btn = document.querySelector(`button[onclick="returnAdminBorrow(${id})"]`);
+    const row = btn.closest("tr");
+
+    // 🔹 Update UI instantly
+    row.querySelector("td:nth-child(6)").textContent = "Returned";   // status column
+    btn.disabled = true;
+
+    // 🔹 Refresh calendar availability
+    await initCalendar();
+
+    // 🔹 Reload table (ensures consistency)
+    await loadAdminBorrowTable(selectedDate);
+}
+
+window.returnAdminBorrow = returnAdminBorrow;
+
 
   /* --------------------------------------------------------
      🔹 INITIALIZE CALENDAR
@@ -577,6 +895,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   ---------------------------------------------------------- */
   initCalendar();
 });
+
+window.returnAdminBorrow = returnAdminBorrow;
+
 </script>
 
 {% endblock %}

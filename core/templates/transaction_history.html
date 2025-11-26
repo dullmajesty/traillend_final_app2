@@ -53,30 +53,65 @@
           <th>Recorded On</th>
           <th>Date &amp; Time Receive</th>
           <th>Date &amp; Time Returned</th>
+          <th>Delivered By</th> 
           <th>Status</th>
         </tr>
       </thead>
       <tbody>
-        {% for t in transactions %}
-        <tr>
+      {% for t in transactions %}
+      <tr>
           <td class="txid">{{ t.transaction_id }}</td>
-            <td class="user">{{ t.user_name }}</td>
-            <td class="item">{{ t.item_name }}</td>
-            <td class="qty">{{ t.quantity }}</td>
-            <td class="contact">{{ t.contact }}</td>
-            <td>{{ t.created_at|date:"Y-m-d h:i A"|default:"—" }}</td>
-            <td class="receive">{{ t.date_receive|date:"Y-m-d h:i A"|default:"—" }}</td>
-            <td class="returned">{{ t.date_returned|date:"Y-m-d h:i A"|default:"—" }}</td>
-            <td class="status">
-              <span class="badge badge-{{ t.status|lower }}">{{ t.status|capfirst }}</span>
+          <td class="user">{{ t.user_name }}</td>
+
+          <!-- ITEM NAMES STACKED -->
+          <td class="item">
+              {% for name in t.item_list %}
+                  <div>{{ name }}</div>
+              {% endfor %}
           </td>
 
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="9" class="empty-state">No transactions found.</td>
-        </tr>
-        {% endfor %}
+          <!-- QUANTITIES STACKED -->
+          <td class="qty">
+              {% for qty in t.qty_list %}
+                  <div>{{ qty }}</div>
+              {% endfor %}
+          </td>
+
+          <td class="contact">{{ t.contact }}</td>
+
+          <td>{{ t.created_at|date:"Y-m-d h:i A" }}</td>
+
+          <td class="receive">
+              {% if t.date_receive %}
+                  {% if t.date_receive.hour or t.date_receive.minute %}
+                      {{ t.date_receive|date:"Y-m-d h:i A" }}
+                  {% else %}
+                      {{ t.date_receive|date:"Y-m-d" }}
+                  {% endif %}
+              {% else %}
+                  —
+              {% endif %}
+          </td>
+
+          <td class="returned">
+              {% if t.date_returned %}
+                  {% if t.date_returned.hour or t.date_returned.minute %}
+                      {{ t.date_returned|date:"Y-m-d h:i A" }}
+                  {% else %}
+                      {{ t.date_returned|date:"Y-m-d" }}
+                  {% endif %}
+              {% else %}
+                  —
+              {% endif %}
+          </td>
+
+          <td class="delivered-by">{{ t.delivered_by|default:"—" }}</td>
+
+          <td class="status">
+              <span class="badge badge-{{ t.status|lower }}">{{ t.status|capfirst }}</span>
+          </td>
+      </tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>

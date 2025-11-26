@@ -84,6 +84,7 @@
                 <button type="button" class="btn export-btn">Export ▼</button>
                 <div class="export-menu">
                     <a id="exportExcel">Excel</a>
+                    <a id="exportDocx">DOCX</a>
                     <a id="exportPdf">PDF</a>
                 </div>
               </div>
@@ -181,16 +182,17 @@ function updateTable() {
         status,
         category,
         report_type: reportType,
-        t: Date.now(),
+        t: Date.now(), // cache buster
     });
 
     fetch(`/statistics/data/?${params.toString()}`)
         .then(res => res.json())
         .then(data => {
+
             const tbody = document.querySelector("#transactionsTable tbody");
             tbody.innerHTML = "";
 
-            if (!data.transactions.length) {
+            if (!data.transactions || data.transactions.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7">No records found.</td></tr>`;
                 return;
             }
@@ -198,17 +200,19 @@ function updateTable() {
             data.transactions.forEach(t => {
                 tbody.innerHTML += `
                     <tr>
-                        <td>${t.item_name}</td>
-                        <td>${t.category}</td>
-                        <td>${t.borrower_name}</td>
-                        <td>${t.borrowed_at}</td>
-                        <td>${t.returned_at}</td>
-                        <td>${t.report_type}</td>
-                        <td><span class="status ${t.status.toLowerCase()}">${t.status}</span></td>
+                        <td>${t.item_name ?? "-"}</td>
+                        <td>${t.category ?? "-"}</td>
+                        <td>${t.borrower_name ?? "-"}</td>
+                        <td>${t.borrowed_at ?? "-"}</td>
+                        <td>${t.returned_at ?? "-"}</td>
+                        <td>${t.report_type ?? "None"}</td>
+                        <td><span class="status ${t.status?.toLowerCase() ?? "unknown"}">${t.status}</span></td>
                     </tr>`;
             });
-        });
+        })
+        .catch(err => console.error("Fetch error:", err));
 }
+
 
 
 // Load table on page load
@@ -224,13 +228,15 @@ function exportFile(type) {
     const end = document.getElementById("endDate").value;
     const status = document.getElementById("statusFilter").value;
     const category = document.getElementById("categoryFilter").value;
+    const report_type = document.getElementById("reportTypeFilter").value;
 
-    const params = new URLSearchParams({ start, end, status, category });
+    const params = new URLSearchParams({ start, end, status, category, report_type });
 
-    window.location.href = `/statistics/export/${type}/?${params.toString()}`;
+    window.location.href = `/statistics/export/${type}/?${params}`;
 }
 
 document.getElementById("exportExcel").addEventListener("click", () => exportFile("excel"));
+document.getElementById("exportDocx").addEventListener("click", () => exportFile("docx"));
 document.getElementById("exportPdf").addEventListener("click", () => exportFile("pdf"));
 
 </script>
@@ -361,10 +367,11 @@ document.getElementById("exportPdf").addEventListener("click", () => exportFile(
 
 .status.pending { background:#fef3c7;color:#b45309; }
 .status.approved { background:#dcfce7;color:#166534; }
-.status["in use"] { background:#dbeafe;color:#1e40af; }
+.status.in-use { background:#dbeafe;color:#1e40af; }
 .status.returned { background:#fef9c3;color:#854d0e; }
 .status.rejected { background:#fee2e2;color:#991b1b; }
 .status.cancelled { background:#e4e4e7;color:#374151; }
+
 
 </style>
 

@@ -28,12 +28,15 @@
         <thead>
           <tr>
             <th>Type</th>
+            <th>Item</th>
             <th>User</th>
             <th>Address</th>
             <th>Location</th>
             <th>Quantity</th>
+            <th>Status</th> <!-- NEW -->
             <th>Image</th>
             <th>Date Submitted</th>
+            <th>Action</th>
           </tr>
         </thead>
 
@@ -41,6 +44,7 @@
           {% if reports %}
             {% for r in reports %}
             <tr class="report-row"
+                data-id="{{ r.id }}"
                 data-type="{{ r.type }}"
                 data-user="{{ r.user_name }}"
                 data-address="{{ r.address }}"
@@ -48,13 +52,18 @@
                 data-date="{{ r.date }}"
                 data-location="{{ r.location }}"
                 data-quantity="{{ r.quantity }}"
-                data-description="{{ r.description }}">
+                data-description="{{ r.description }}"
+                data-item="{{ r.item_name }}">
 
               <td><span class="type-badge {{ r.type|lower }}">{{ r.type }}</span></td>
+              <td>{{ r.item_name }}</td>
               <td>{{ r.user_name }}</td>
               <td>{{ r.address }}</td>
               <td>{{ r.location }}</td>
               <td>{{ r.quantity }}</td>
+
+              <!-- NEW STATUS COLUMN -->
+              <td class="status-col">{{ r.status }}</td>
 
               <td>
                 {% if r.image != "No image" %}
@@ -65,11 +74,34 @@
               </td>
 
               <td>{{ r.date }}</td>
+
+              <!-- ACTION BUTTONS -->
+              <td>
+                {% if r.type == "Damage" %}
+                    {% if r.status == "Pending" %}
+                      <button class="action-btn action-review" data-action="review">Review</button>
+                    {% elif r.status == "Reviewed" %}
+                      <button class="action-btn action-resolve" data-action="resolve">Resolve</button>
+                    {% else %}
+                      <button class="action-btn action-disabled" disabled>Done</button>
+                    {% endif %}
+
+                {% elif r.type == "Loss" %}
+                    {% if r.status == "Pending" %}
+                      <button class="action-btn action-review" data-action="verify">Verify</button>
+                    {% elif r.status == "Verified" %}
+                      <button class="action-btn action-resolve" data-action="settle">Settle</button>
+                    {% else %}
+                      <button class="action-btn action-disabled" disabled>Done</button>
+                    {% endif %}
+                {% endif %}
+              </td>
+
             </tr>
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="7" class="no-data">No Reports Found</td>
+              <td colspan="10" class="no-data">No Reports Found</td>
             </tr>
           {% endif %}
         </tbody>
@@ -78,7 +110,7 @@
   </section>
 </div>
 
-<!-- ===================== FULL CSS RESTORED ===================== -->
+
 <style>
 .damage-page {
   display: grid;
@@ -251,61 +283,132 @@
 .type-badge.loss {
   background: #1d4ed8; /* blue */
 }
+
+
+.action-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: 0.2s;
+  color: white;
+}
+
+/* Blue buttons → Review, Verify */
+.action-review {
+  background: #2563eb;
+}
+.action-review:hover {
+  background: #1e40af;
+}
+
+/* Green buttons → Resolve, Settle */
+.action-resolve {
+  background: #16a34a;
+}
+.action-resolve:hover {
+  background: #15803d;
+}
+
+/* Gray disabled */
+.action-disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
 </style>
 
-<!-- ===================== JS UPDATE ===================== -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const rows = document.querySelectorAll(".report-row");
-  const details = document.getElementById("report-details");
 
+  /* ========== PREVIEW ========== */
   rows.forEach(row => {
     row.addEventListener("click", function () {
       rows.forEach(r => r.classList.remove("active"));
       this.classList.add("active");
 
-      const type = this.dataset.type;
-      const user = this.dataset.user;
-      const address = this.dataset.address;
-      const image = this.dataset.image;
-      const date = this.dataset.date;
-      const location = this.dataset.location;
-      const quantity = this.dataset.quantity;
-      const description = this.dataset.description;
+      const d = document.getElementById("report-details");
 
       const imageHTML =
-        image && image !== "No image"
-          ? `<img src="${image}" alt="Report Image">`
-          : `<div class='no-img'>No image available</div>`;
+        this.dataset.image !== "No image"
+          ? `<img src="${this.dataset.image}" alt="">`
+          : `<div class="no-img">No image available</div>`;
 
-      details.classList.remove("report-details-empty");
-      details.innerHTML = `
-        <span class="type-badge ${type.toLowerCase()}">${type}</span>
+      d.classList.remove("report-details-empty");
+      d.innerHTML = `
+        <span class="type-badge ${this.dataset.type.toLowerCase()}">${this.dataset.type}</span>
         <br><br>
         ${imageHTML}
-        <p><strong>Type:</strong> ${type}</p>
-        <p><strong>User:</strong> ${user}</p>
-        <p><strong>Address:</strong> ${address}</p>
-        <p><strong>Date:</strong> ${date}</p>
+        <p><strong>Type:</strong> ${this.dataset.type}</p>
+        <p><strong>Item:</strong> ${this.dataset.item}</p>
+        <p><strong>User:</strong> ${this.dataset.user}</p>
+        <p><strong>Address:</strong> ${this.dataset.address}</p>
+        <p><strong>Date:</strong> ${this.dataset.date}</p>
         <hr>
-        <p><strong>Location:</strong> ${location}</p>
-        <p><strong>Quantity Affected:</strong> ${quantity}</p>
-        <p><strong>Description:</strong><br>${description}</p>
+        <p><strong>Location:</strong> ${this.dataset.location}</p>
+        <p><strong>Quantity Affected:</strong> ${this.dataset.quantity}</p>
+        <p><strong>Description:</strong><br>${this.dataset.description}</p>
       `;
     });
   });
 
-  // Search Filter
+  /* ========== ACTION HANDLER ========== */
+  rows.forEach(row => {
+    const actionBtn = row.querySelector(".action-btn");
+
+    if (!actionBtn || actionBtn.disabled) return;
+
+    actionBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+
+      const reportId = row.dataset.id;
+      const action = this.dataset.action;
+
+      const formData = new FormData();
+      formData.append("action", action);
+
+      fetch(`/damage-report/update-status/${reportId}/`, {
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}" },
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+
+          /* Update the status in table */
+          row.querySelector(".status-col").innerText = data.new_status;
+
+          /* Update button behavior */
+          if (data.new_status === "Reviewed" || data.new_status === "Verified") {
+            this.innerText = row.dataset.type === "Damage" ? "Resolve" : "Settle";
+            this.classList.remove("action-review");
+            this.classList.add("action-resolve");
+            this.dataset.action = row.dataset.type === "Damage" ? "resolve" : "settle";
+          } else {
+            this.innerText = "Done";
+            this.className = "action-btn action-disabled";
+            this.disabled = true;
+          }
+        }
+      });
+    });
+  });
+
+  /* ========== SEARCH ========== */
   const searchInput = document.getElementById("search-input");
   searchInput.addEventListener("keyup", function () {
     const value = this.value.toLowerCase();
     rows.forEach(row => {
       const user = row.dataset.user.toLowerCase();
       const address = row.dataset.address.toLowerCase();
-      row.style.display = user.includes(value) || address.includes(value) ? "" : "none";
+      row.style.display = (user.includes(value) || address.includes(value)) ? "" : "none";
     });
   });
 });
 </script>
 
 {% endblock %}
+

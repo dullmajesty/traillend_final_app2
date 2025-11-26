@@ -16,9 +16,11 @@
   <!-- Top Controls -->
   <form method="get" class="inventory-controls">
     <div class="control-group">
-      <input type="text" name="q" value="{{ q }}" placeholder=" Search items..." class="input search">
 
-      <select name="category" class="input select">
+      <!-- ❌ Search Removed -->
+
+      <!-- AUTO SUBMIT ON CHANGE -->
+      <select name="category" class="input select" onchange="this.form.submit()">
         <option value="">All Categories</option>
         <option value="Seating" {% if category == "Seating" %}selected{% endif %}>Seating</option>
         <option value="Tables" {% if category == "Tables" %}selected{% endif %}>Tables</option>
@@ -32,22 +34,23 @@
         <option value="Transportation" {% if category == "Transportation" %}selected{% endif %}>Transportation</option>
       </select>
 
-      <select name="status" class="input select">
+      <select name="status" class="input select" onchange="this.form.submit()">
         <option value="">All Status</option>
         <option value="Available" {% if status == "Available" %}selected{% endif %}>Available</option>
         <option value="Not Available" {% if status == "Not Available" %}selected{% endif %}>Not Available</option>
       </select>
 
-      <select name="sort" class="input select">
+      <select name="sort" class="input select" onchange="this.form.submit()">
         <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest</option>
         <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest</option>
       </select>
 
-      <button type="submit" class="btn outline">Apply</button>
+      <!-- ❌ Apply Button Removed -->
     </div>
 
     <div class="control-summary">
       <span>Total Items: <strong>{{ total_items }}</strong></span>
+      <span style="margin-left: 20px;">Total Quantity: <strong>{{ total_quantity }}</strong></span>
     </div>
   </form>
 
